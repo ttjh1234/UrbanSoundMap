@@ -34,7 +34,8 @@ def parse_option():
     parser.add_argument('--model', type=str, default='resnet110',
                         choices=['resnet20', 'resnet32', 'resnet56', 'resnet110', 'resnet14', 'resnet44','resnet50','resnet34',
                                  'resnet8x4', 'resnet32x4','resnet18','wrn_28_10', 'wrn_16_2', 'wrn_40_1', 'wrn_40_2',
-                                 'vgg8','vgg11','vgg13','vgg16', 'MobileNetV2','simple', 'wrn_16_1','MobileNetV2_0.35','MobileNetV2_1.0'])
+                                 'vgg8','vgg11','vgg13','vgg16', 'MobileNetV2','simple', 'wrn_16_1','MobileNetV2_0.35','MobileNetV2_1.0',
+                                 'inception_resnetv2','inception_resnetv2_2'])
     parser.add_argument('--dataset', type=str, default='sound', choices=['sound',], help='dataset')
 
     # Experiment

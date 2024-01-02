@@ -4,6 +4,9 @@ from .wrn import wrn_16_1, wrn_16_2, wrn_40_1, wrn_40_2, wrn_28_10
 from .vgg import vgg19_bn, vgg16_bn, vgg13_bn, vgg11_bn, vgg8_bn
 from .mobilenetv2 import mobile_half, mobile_light, mobile_heavy
 from .simple import image_classification
+from .inception_resnetv2 import inception_resnet_v2
+from .inception_resnetv2_2 import inception_resnetv2_2
+
 
 model_dict = {
     'resnet8': resnet8,
@@ -31,5 +34,7 @@ model_dict = {
     'MobileNetV2': mobile_half,
     'simple' : image_classification,
     'MobileNetV2_0.35' : mobile_light,
-    'MobileNetV2_1.0' : mobile_heavy,    
+    'MobileNetV2_1.0' : mobile_heavy,
+    'inception_resnetv2' : inception_resnet_v2,
+    'inception_resnetv2_2' : inception_resnetv2_2
 }
