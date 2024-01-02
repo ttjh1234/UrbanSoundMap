@@ -1,0 +1,15 @@
+*neptune
+*__pycache__
+*.h5
+*.data
+assets
+tryto.py
+*.sh
+hyperparam.py
+hyperparam2.py
+backup.py
+wandb
+*.err
+*.out
+*.txt
+tryto2.py
