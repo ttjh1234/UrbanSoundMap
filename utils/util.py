@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+import time
 
 def rescale_data(x,mean=None,std=None):
     
@@ -29,3 +31,36 @@ def adjust_learning_rate(epoch, opt, optimizer):
         new_lr = opt.learning_rate * (opt.lr_decay_rate ** steps)
         for param_group in optimizer.param_groups:
             param_group['lr'] = new_lr
+            
+def check_inference_time_for_gpu(model, device):
+    dummy_input = torch.zeros((1,1,100,100))
+    model.eval()
+    model = model.to(device)
+    dummy_input = dummy_input.to(device)
+    
+    start_event = torch.cuda.Event(enable_timing = True)
+    end_event = torch.cuda.Event(enable_timing = True)
+    
+    with torch.no_grad(): 
+        start_event.record()
+        _ = model(dummy_input)
+        end_event.record()
+    
+    torch.cuda.synchronize()
+    
+    time_taken = start_event.elapsed_time(end_event)
+    print(f"Elapsed time on GPU : {time_taken * 1e-3} seconds")
+    
+
+def check_inference_time_for_cpu(model):
+    dummy_input = torch.zeros((1,1,100,100))
+    model.eval()
+    
+    with torch.no_grad(): 
+        start = time.perf_counter()
+        _ = model(dummy_input)
+        end = time.perf_counter()
+    
+    print(f"Elapsed time on CPU : {end - start} seconds")
+    
+

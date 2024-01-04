@@ -27,7 +27,7 @@ def parse_option():
     parser.add_argument('--learning_rate', type=float, default=0.003, help='learning rate')
     parser.add_argument('--lr_decay_epochs', type=str, default='10,20,30', help='where to decay lr, can be a list')
     parser.add_argument('--lr_decay_rate', type=float, default=0.05, help='decay rate for learning rate')
-    parser.add_argument('--weight_decay', type=float, default=5e-4, help='weight decay')
+    parser.add_argument('--weight_decay', type=float, default=1e-4, help='weight decay') # default 5e-4
     parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 
     # dataset
@@ -86,7 +86,7 @@ def main():
     else:
         run=0
     
-    set_random_seed(opt.trial)
+    set_random_seed(0)
 
     # dataloader
     if opt.dataset == 'sound':
@@ -101,9 +101,8 @@ def main():
     # optimizer
     best_loss = 1e+5
     
-    optimizer = optim.SGD(model.parameters(),
+    optimizer = optim.Adam(model.parameters(),
                           lr=opt.learning_rate,
-                          momentum=opt.momentum,
                           weight_decay=opt.weight_decay)
 
     criterion = nn.MSELoss()
@@ -130,14 +129,14 @@ def main():
         print(f'\tTrain RMSE: {train_rmse:.4f}')
         print(f'\t Val. RMSE: {valid_rmse:.4f}')
          
-        if valid_loss < best_loss:
-            best_loss = valid_loss
+        if valid_rmse < best_loss:
+            best_loss = valid_rmse
             torch.save(model.state_dict(), './assets/model/{}-{}.pt'.format(opt.model,opt.trial))
             
         if opt.run_flag==1:
             wandb.log({"train/epoch_loss": train_loss, 
                         "valid/epoch_loss" : valid_loss,
-                        "valid/loss_least" : best_loss})    
+                        "valid/Best_RMSE" : best_loss})    
     
     wandb.finish()
 

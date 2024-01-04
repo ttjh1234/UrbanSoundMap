@@ -26,6 +26,7 @@ def train(model, iterator, optimizer, criterion, device, run=0):
                     
         loss = criterion(output.squeeze(1), target)
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(),3)
         optimizer.step()
         epoch_loss += loss.item()
         
