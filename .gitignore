@@ -13,3 +13,5 @@ wandb
 *.out
 *.txt
 tryto2.py
+old_process
+printout

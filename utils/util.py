@@ -19,6 +19,23 @@ def rescale_data(x,mean=None,std=None):
     x=np.transpose(x,[1,2,0])
     return x
 
+def rescale_multi_data(x,mean=None,std=None):
+    
+    '''
+    Input x is (C,H,W) image and normalized vec. 
+    Output is (H,W,C) image and denormalized vec.
+    '''
+    
+    if not mean:
+        mean=np.array((0.92018, 0.99356, 0.91374)).reshape(-1,1,1)
+    
+    if not std:
+        std=np.array((0.20518, 0.04393, 0.20895)).reshape(-1,1,1)
+    
+    x=x*std+mean
+    x=np.transpose(x,[1,2,0])
+    return x
+
 def epoch_time(start_time, end_time):
     elapsed_time = end_time - start_time
     elapsed_mins = int(elapsed_time / 60)

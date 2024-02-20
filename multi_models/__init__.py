@@ -6,7 +6,7 @@ from .mobilenetv2 import mobile_half, mobile_light, mobile_heavy
 from .simple import image_classification
 from .inception_resnetv2 import inception_resnet_v2
 from .inception_resnetv2_2 import inception_resnetv2_2
-
+from .mymodel import myvgg8_bn,myvgg11_bn,myvgg13_bn,myvgg16_bn,myvgg19_bn
 
 model_dict = {
     'resnet8': resnet8,
@@ -33,6 +33,11 @@ model_dict = {
     'vgg13': vgg13_bn,
     'vgg16': vgg16_bn,
     'vgg19': vgg19_bn,
+    'myvgg8': myvgg8_bn,
+    'myvgg11': myvgg11_bn,
+    'myvgg13': myvgg13_bn,
+    'myvgg16': myvgg16_bn,
+    'myvgg19': myvgg19_bn,
     'MobileNetV2': mobile_half,
     'simple' : image_classification,
     'MobileNetV2_0.35' : mobile_light,

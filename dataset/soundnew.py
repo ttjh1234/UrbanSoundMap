@@ -9,81 +9,24 @@ import torchvision.transforms as transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.transforms.functional import hflip, vflip
+from torchvision.transforms.functional import hflip, rotate
 from PIL import Image
 from scipy import interpolate
 import random
 
-# Sound Augmentation Random Horizontal Flip and Random Vertical Flip
-class SoundRandomHorizontalFlip(nn.Module):
-    def __init__(self, p=0.5):
+class SoundRandomRotate(nn.Module):
+    def __init__(self, candidate_list):
         super().__init__()
-
-        assert (p>=0) & (p<=1)
-        self.p=p
+        self.candidate = candidate_list
     
-    def forward(self, data):
-        if torch.rand(1)<self.p:
-            img=data[1:,:,:]
-            expansion=data[:1,:,:]
-            flip_img=hflip(img)
-            flip_expansion=hflip(expansion)
-            data=torch.cat([flip_expansion, flip_img],dim=0)
+    def forward(self, x):
+        angle = random.choice(self.candidate)
+        x = rotate(x, angle)
 
-        return data
-    
-class SoundRandomVerticalFlip(nn.Module):
-    def __init__(self, p=0.5):
-        super().__init__()
+        return x
 
-        assert (p>=0) & (p<=1)
-        self.p=p
-    
-    def forward(self, data):
-        if torch.rand(1)<self.p:
-            img=data[1:,:,:]
-            expansion=data[:1,:,:]
-            flip_img=vflip(img)
-            flip_expansion=vflip(expansion)
-            data=torch.cat([flip_expansion, flip_img],dim=0)
 
-        return data
- 
 class SoundInstance(Dataset):
-    # Single Channel Dataset 10m x 10m resolution
-    def __init__(self, path, train=True, transform=None,target_transform=None):
-
-        self.transform=transform
-        self.target_transform=target_transform
-        self.train=train
-        
-        if self.train:
-            self.origin_img=np.load(path+'/train_img10.npy')
-            self.label=np.load(path+'/train_label.npy')
-        
-        else:
-            self.origin_img=np.load(path+'/test_img10.npy')
-            self.label=np.load(path+'/test_label.npy')    
-            
-    def __len__(self):
-        return self.origin_img.shape[0]
-
-    def __getitem__(self, index):
-
-        img=torch.tensor(self.origin_img[index],dtype=torch.float).unsqueeze(0)
-        target=torch.tensor(self.label[index],dtype=torch.float)
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        return img, target, index
-
-
-class SoundExpansionInstance(Dataset):
-    # Single Channel Dataset 1m x 1m resolution
     def __init__(self, path, train=True, transform=None,target_transform=None):
 
         self.transform=transform
@@ -91,11 +34,11 @@ class SoundExpansionInstance(Dataset):
         self.train=train
                
         if self.train:
-            self.img=np.load(path+'/train_img1.npy')           
+            self.img=np.load(path+'/train_img.npy')
             self.label=np.load(path+'/train_label.npy')
         
         else:
-            self.img=np.load(path+'/test_img1.npy')
+            self.img=np.load(path+'/test_img.npy')
             self.label=np.load(path+'/test_label.npy')
             
     def __len__(self):
@@ -115,8 +58,7 @@ class SoundExpansionInstance(Dataset):
         return img, target, index
 
 
-class SoundDetachedOriginInstance(Dataset):
-    # Multi Channel Dataset 10m x 10m resolution
+class SoundDetachedInstance(Dataset):
     def __init__(self, path, train=True, transform=None,target_transform=None):
 
         self.transform=transform
@@ -124,19 +66,18 @@ class SoundDetachedOriginInstance(Dataset):
         self.train=train
                
         if self.train:
-            self.origin_img=np.load(path+'/train_img10.npy')
+            self.img=np.load(path+'/train_img.npy')
             self.label=np.load(path+'/train_label.npy')
         
         else:
-            self.origin_img=np.load(path+'/test_img10.npy')
+            self.img=np.load(path+'/test_img.npy')
             self.label=np.load(path+'/test_label.npy')
-
             
     def __len__(self):
-        return self.origin_img.shape[0]
+        return self.img.shape[0]
 
     def __getitem__(self, index):
-        one_img = self.origin_img[index].reshape(1,100,100)
+        one_img = self.img[index].reshape(1,100,100)
         multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
 
         multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],1.0)
@@ -145,113 +86,15 @@ class SoundDetachedOriginInstance(Dataset):
         img=torch.tensor(multi_channel_img,dtype=torch.float)
         target=torch.tensor(self.label[index],dtype=torch.float)
 
-
         if self.transform is not None:
             img = self.transform(img)
 
         if self.target_transform is not None:
             target = self.target_transform(target)
-        
+
         return img, target, index
-
-
-class SoundDetachedInstance(Dataset):
-    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
-    def __init__(self, path, train=True, transform=None,target_transform=None):
-
-        self.transform=transform
-        self.target_transform=target_transform
-        self.train=train
-               
-        if self.train:
-            self.origin_img=np.load(path+'/train_img10.npy')
-            self.expansion_img=np.load(path+'/train_img1.npy')           
-            self.label=np.load(path+'/train_label.npy')
-        
-        else:
-            self.origin_img=np.load(path+'/test_img10.npy')
-            self.expansion_img=np.load(path+'/test_img1.npy')           
-            self.label=np.load(path+'/test_label.npy')
-
-            
-    def __len__(self):
-        return self.origin_img.shape[0]
-
-    def __getitem__(self, index):
-        one_img = self.origin_img[index].reshape(1,100,100)
-        expansion_img = self.expansion_img[index].reshape(1,100,100) 
-        multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
-
-        multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],1.0)
-        multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],1.0)
-        
-        origin_img=torch.tensor(multi_channel_img,dtype=torch.float)
-        expansion_img=torch.tensor(expansion_img,dtype=torch.float)
-        target=torch.tensor(self.label[index],dtype=torch.float)
-
-        img = torch.cat([expansion_img, origin_img],dim=0)
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-        
-        return img, target, index
-
-
-class SoundDetachedExpressInstance(Dataset):
-    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution, delete non-object image
-    def __init__(self, path, train=True, transform=None,target_transform=None):
-
-        self.transform=transform
-        self.target_transform=target_transform
-        self.train=train
-               
-        if self.train:
-            self.origin_img=np.load(path+'/train_img10.npy')
-            self.expansion_img=np.load(path+'/train_img1.npy')           
-            self.label=np.load(path+'/train_label.npy')
-            self.origin_img = np.delete(self.origin_img,[89300,89313,149813],axis=0)
-            self.expansion_img = np.delete(self.expansion_img,[89300,89313,149813],axis=0)
-            self.label = np.delete(self.label,[89300,89313,149813],axis=0)
-        
-        else:
-            self.origin_img=np.load(path+'/test_img10.npy')
-            self.expansion_img=np.load(path+'/test_img1.npy')           
-            self.label=np.load(path+'/test_label.npy')
-
-            
-    def __len__(self):
-        return self.origin_img.shape[0]
-
-    def __getitem__(self, index):
-        one_img = self.origin_img[index].reshape(1,100,100)
-        expansion_img = self.expansion_img[index].reshape(1,100,100) 
-        if np.isclose(np.sum(1-expansion_img,axis=(1,2)),0.0, atol=1e-5):
-            expansion_img = one_img
-        multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
-
-        multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],1.0)
-        multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],1.0)
-        
-        origin_img=torch.tensor(multi_channel_img,dtype=torch.float)
-        expansion_img=torch.tensor(expansion_img,dtype=torch.float)
-        target=torch.tensor(self.label[index],dtype=torch.float)
-
-        img = torch.cat([expansion_img, origin_img],dim=0)
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-        
-        return img, target, index
-
 
 class SoundDetachedMaskInstance(Dataset):
-    # Multi Channel Dataset 10m x 10m + Mask generate
     def __init__(self, path, train=True, transform=None,target_transform=None):
 
         self.transform=transform
@@ -259,113 +102,254 @@ class SoundDetachedMaskInstance(Dataset):
         self.train=train
                
         if self.train:
-            self.origin_img=np.load(path+'/train_img10.npy')
-            #self.expansion_img=np.load(path+'/train_img1.npy')           
+            self.img=np.load(path+'/train_img.npy')
             self.label=np.load(path+'/train_label.npy')
         
         else:
-            self.origin_img=np.load(path+'/test_img10.npy')
-            #self.expansion_img=np.load(path+'/test_img1.npy')           
+            self.img=np.load(path+'/test_img.npy')
             self.label=np.load(path+'/test_label.npy')
-
             
     def __len__(self):
-        return self.origin_img.shape[0]
+        return self.img.shape[0]
 
     def __getitem__(self, index):
-        one_img = self.origin_img[index].reshape(1,100,100)
-        #expansion_img = self.expansion_img[index].reshape(1,100,100) 
+        one_img = self.img[index].reshape(1,100,100)
         multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
 
         multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],1.0)
         multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],1.0)
+        mask = np.where(np.isclose(one_img,1.0,atol=1e-5),1,0)
         
-        mask = np.where(multi_channel_img[2]==1.0, 0.0, 1.0).reshape(1,100,100) # 1,100,100
-        
-        #origin_img=torch.tensor(multi_channel_img,dtype=torch.float)
-        #expansion_img=torch.tensor(expansion_img,dtype=torch.float)
         img=torch.tensor(multi_channel_img,dtype=torch.float)
         target=torch.tensor(self.label[index],dtype=torch.float)
-
-        #img = torch.cat([expansion_img, origin_img],dim=0)
 
         if self.transform is not None:
             img = self.transform(img)
 
         if self.target_transform is not None:
             target = self.target_transform(target)
+
+        return img, target, mask, index
+
+
+class SoundDetachedInstance2(Dataset):
+    def __init__(self, path, train=True, transform=None,target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+        self.train=train
+               
+        if self.train:
+            self.img=np.load(path+'/train_img.npy')
+            self.label=np.load(path+'/train_label.npy')
         
-        return img, mask, target, index
+        else:
+            self.img=np.load(path+'/test_img.npy')
+            self.label=np.load(path+'/test_label.npy')
+            
+    def __len__(self):
+        return self.img.shape[0]
 
-def get_no_aug_sound_dataloaders(path,batch_size=128, num_workers=4):
+    def road_minmax(self,x):
+        x = np.clip((x - 90/255) / ((255 - 90)/255),0.0,1.0)
+        return x
+
+    def build_minmax(self,x):
+        x = x/(90/255.0)
+        return x
+
+    def __getitem__(self, index):
+        # one_img = self.img[index].reshape(1,100,100)
+        # multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
+
+        # multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],0.0)
+        # multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],0.0)
+        # multi_channel_img[1,:,:] = np.where(multi_channel_img[1,:,:]>=1.0, 0.0, multi_channel_img[1,:,:])
+        # multi_channel_img[0,:,:] = self.build_minmax(multi_channel_img[0,:,:])
+        # multi_channel_img[1,:,:] = self.road_minmax(multi_channel_img[1,:,:])
+        
+        # img=torch.tensor(multi_channel_img,dtype=torch.float)
+        # target=torch.tensor(self.label[index],dtype=torch.float)
+
+        # if self.transform is not None:
+        #     img = self.transform(img)
+
+        # if self.target_transform is not None:
+        #     target = self.target_transform(target)
+
+        # return img, target, index
+        one_img = self.img[index].reshape(1,100,100)
+        multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
+
+        multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],0.0)
+        multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],0.0)
+        multi_channel_img[1,:,:] = np.where(multi_channel_img[1,:,:]>=1.0, 0.0, multi_channel_img[1,:,:])
+        multi_channel_img[0,:,:] = self.build_minmax(multi_channel_img[0,:,:])
+        multi_channel_img[1,:,:] = self.road_minmax(multi_channel_img[1,:,:])
+        
+        img=torch.tensor(multi_channel_img[:2,:,:],dtype=torch.float)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return img, target, index
+
+
+class SoundDetachedInstance3(Dataset):
+    def __init__(self, path, train=True, transform=None,target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+        self.train=train
+               
+        if self.train:
+            self.img=np.load(path+'/train_img.npy')
+            self.label=np.load(path+'/train_label.npy')
+        
+        else:
+            self.img=np.load(path+'/test_img.npy')
+            self.label=np.load(path+'/test_label.npy')
+            
+    def __len__(self):
+        return self.img.shape[0]
+
+    def road_minmax(self,x):
+        x = np.clip((x - 90/255) / ((255 - 90)/255),0.0,1.0)
+        return x
+
+    def build_minmax(self,x):
+        x = x/(90/255.0)
+        return x
+
+    def __getitem__(self, index):
+        # one_img = self.img[index].reshape(1,100,100)
+        # multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
+
+        # multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],0.0)
+        # multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],0.0)
+        # multi_channel_img[1,:,:] = np.where(multi_channel_img[1,:,:]>=1.0, 0.0, multi_channel_img[1,:,:])
+        # multi_channel_img[0,:,:] = self.build_minmax(multi_channel_img[0,:,:])
+        # multi_channel_img[1,:,:] = self.road_minmax(multi_channel_img[1,:,:])
+        
+        # img=torch.tensor(multi_channel_img,dtype=torch.float)
+        # target=torch.tensor(self.label[index],dtype=torch.float)
+
+        # if self.transform is not None:
+        #     img = self.transform(img)
+
+        # if self.target_transform is not None:
+        #     target = self.target_transform(target)
+
+        # return img, target, index
+        one_img = self.img[index].reshape(1,100,100)
+        multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
+
+        multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],0.0)
+        multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],0.0)
+        multi_channel_img[1,:,:] = np.where(multi_channel_img[1,:,:]>=1.0, 0.0, multi_channel_img[1,:,:])
+        multi_channel_img[0,:,:] = self.build_minmax(multi_channel_img[0,:,:])
+        multi_channel_img[1,:,:] = self.road_minmax(multi_channel_img[1,:,:])
+        
+        img=torch.tensor(multi_channel_img,dtype=torch.float)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return img, target, index
+
+
+class SoundDetachedTwoInstance(Dataset):
+    def __init__(self, path, train=True, transform=None,target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+        self.train=train
+               
+        if self.train:
+            self.img=np.load(path+'/train_img.npy')
+            self.label=np.load(path+'/train_label.npy')
+        
+        else:
+            self.img=np.load(path+'/test_img.npy')
+            self.label=np.load(path+'/test_label.npy')
+            
+    def __len__(self):
+        return self.img.shape[0]
+
+    def __getitem__(self, index):
+        one_img = self.img[index].reshape(1,100,100)
+        multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
+
+        multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],1.0)
+        multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],1.0)
+        
+        img=torch.tensor(multi_channel_img[:2,:,:],dtype=torch.float)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return img, target, index
+
+class SoundAnalysis(Dataset):
+    def __init__(self, path, train=True, transform=None,target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+        self.train=train
+               
+        if self.train:
+            self.img=np.load(path+'/train_img.npy')
+            self.label=np.load(path+'/train_label.npy')
+            self.coord=np.load(path+'/train_coord.npy')
+        
+        else:
+            self.img=np.load(path+'/test_img.npy')
+            self.label=np.load(path+'/test_label.npy')
+            self.coord=np.load(path+'/test_coord.npy')
+            
+    def __len__(self):
+        return self.img.shape[0]
+
+    def __getitem__(self, index):
+
+        img=torch.tensor(self.img[index],dtype=torch.float).unsqueeze(0)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+        coord=torch.tensor(self.coord[index],dtype=torch.float)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return img, target, coord, index
+
     
-    """
-    Sound Map data No aug Experiment for single channel dataset
-    """
-    
-    train_transform = transforms.Compose([
-        transforms.Normalize((0.91374), (0.20895)),
-    ])
-    
-    test_transform = transforms.Compose([
-        transforms.Normalize((0.91374), (0.20895)),
-    ])
-
-
-    train_set = SoundInstance(path,train = True, transform = train_transform)
-    n_data = len(train_set)
-
-    train_loader = DataLoader(train_set,
-                              batch_size=batch_size,
-                              shuffle=True,
-                              num_workers=num_workers)
-
-    test_set = SoundInstance(path, train=False, transform = test_transform)
-
-    test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
-
-
-    return train_loader, test_loader, n_data
-
-def get_aug_crop_sound_dataloaders(path,batch_size=128, num_workers=4):
-    
-    """
-    Sound Map data not efficient aug Experiment for single channel dataset
-    """
-    
-    train_transform = transforms.Compose([
-        transforms.RandomCrop(100,4),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.Normalize((0.91374), (0.20895)),
-    ])
-    
-    test_transform = transforms.Compose([
-        transforms.Normalize((0.91374), (0.20895)),
-    ])
-
-
-    train_set = SoundInstance(path,train = True, transform = train_transform)
-    n_data = len(train_set)
-
-    train_loader = DataLoader(train_set,
-                              batch_size=batch_size,
-                              shuffle=True,
-                              num_workers=num_workers)
-
-    test_set = SoundInstance(path, train=False, transform = test_transform)
-
-    test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
-
-
-    return train_loader, test_loader, n_data
 
 def get_sound_dataloaders(path,batch_size=128, num_workers=4):
     
     """
-    Sound Map data efficient aug Experiment for single channel dataset
+    Sound Map data
     """
     
+    # train_transform = transforms.Compose([
+    #     transforms.RandomHorizontalFlip(),
+    #     transforms.RandomVerticalFlip(),
+    #     SoundRandomRotate([0,90,180,270]),
+    #     transforms.Normalize((0.91374), (0.20895)),
+    # ])
     train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
@@ -392,26 +376,22 @@ def get_sound_dataloaders(path,batch_size=128, num_workers=4):
 
     return train_loader, test_loader, n_data
 
-
-
-def get_expansion_sound_dataloaders(path,batch_size=128, num_workers=4):
+def get_sound_dataloaders_no_aug(path,batch_size=128, num_workers=4):
     
     """
-    Sound Map Expansion data (1m x 1m ) Only, single channel
+    Sound Map data
     """
     
     train_transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.Normalize((0.93444), (0.13224)),
+        transforms.Normalize((0.91374), (0.20895)),
     ])
     
     test_transform = transforms.Compose([
-        transforms.Normalize((0.93444), (0.13224)),
+        transforms.Normalize((0.91374), (0.20895)),
     ])
 
 
-    train_set = SoundExpansionInstance(path,train = True, transform = train_transform)
+    train_set = SoundInstance(path,train = True, transform = train_transform)
     n_data = len(train_set)
 
     train_loader = DataLoader(train_set,
@@ -419,59 +399,88 @@ def get_expansion_sound_dataloaders(path,batch_size=128, num_workers=4):
                               shuffle=True,
                               num_workers=num_workers)
 
-    test_set = SoundExpansionInstance(path, train=False, transform = test_transform)
+    test_set = SoundInstance(path, train=False, transform = test_transform)
 
     test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
 
     return train_loader, test_loader, n_data
 
-def get_detached_origin_sound_dataloaders(path,batch_size=128, num_workers=4):
-    
+
+def get_sound_analysis_dataloaders(path,batch_size=128, num_workers=4):
     """
-    Sound Map multi channel data
+    Sound Map data
     """
     
     train_transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.Normalize((0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
+        transforms.Normalize((0.91374), (0.20895)),
     ])
     
     test_transform = transforms.Compose([
-        transforms.Normalize((0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
+        transforms.Normalize((0.91374), (0.20895)),
     ])
 
 
-    train_set = SoundDetachedOriginInstance(path,train = True, transform = train_transform)
+    train_set = SoundAnalysis(path,train = True, transform = train_transform)
     n_data = len(train_set)
 
     train_loader = DataLoader(train_set,
                               batch_size=batch_size,
-                              shuffle=True,
+                              shuffle=False,
                               num_workers=num_workers)
 
-    test_set = SoundDetachedOriginInstance(path, train=False, transform = test_transform)
+    test_set = SoundAnalysis(path, train=False, transform = test_transform)
 
     test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
 
     return train_loader, test_loader, n_data
+
 
 def get_detached_sound_dataloaders(path,batch_size=128, num_workers=4):
     
     """
-    Sound Map multi + expansion data
+    Sound Map data
     """
     
     train_transform = transforms.Compose([
-        SoundRandomHorizontalFlip(),
-        SoundRandomVerticalFlip(),
-        transforms.Normalize((0.93444, 0.92018, 0.99356 ,0.91374), (0.13224, 0.20518, 0.04393 ,0.20895)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.Normalize(( 0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
     ])
     
     test_transform = transforms.Compose([
-        transforms.Normalize((0.93444, 0.92018, 0.99356 ,0.91374), (0.13224, 0.20518, 0.04393 ,0.20895)),
+        transforms.Normalize(( 0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
+    ])
+
+
+    train_set = SoundDetachedInstance(path,train = True, transform = train_transform)
+    n_data = len(train_set)
+
+    train_loader = DataLoader(train_set,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              num_workers=num_workers)
+
+    test_set = SoundDetachedInstance(path, train=False, transform = test_transform)
+
+    test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+
+    return train_loader, test_loader, n_data
+
+def get_detached_sound_noaug_dataloaders(path,batch_size=128, num_workers=4):
+    
+    """
+    Sound Map data
+    """
+    
+    train_transform = transforms.Compose([
+        transforms.Normalize(( 0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
+    ])
+    
+    test_transform = transforms.Compose([
+        transforms.Normalize(( 0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
     ])
 
 
@@ -491,52 +500,20 @@ def get_detached_sound_dataloaders(path,batch_size=128, num_workers=4):
     return train_loader, test_loader, n_data
 
 
-def get_detached_express_sound_dataloaders(path,batch_size=128, num_workers=4):
+def get_detached_mask_sound_dataloaders(path,batch_size=128, num_workers=4):
     
     """
     Sound Map data
     """
     
     train_transform = transforms.Compose([
-        SoundRandomHorizontalFlip(),
-        SoundRandomVerticalFlip(),
-        transforms.Normalize((0.92119, 0.92018, 0.99356 ,0.91374), (0.18750, 0.20518, 0.04393 ,0.20895)),
-    ])
-    
-    test_transform = transforms.Compose([
-        transforms.Normalize((0.92119, 0.92018, 0.99356 ,0.91374), (0.18750, 0.20518, 0.04393 ,0.20895)),
-    ])
-
-
-    train_set = SoundDetachedExpressInstance(path,train = True, transform = train_transform)
-    n_data = len(train_set)
-
-    train_loader = DataLoader(train_set,
-                              batch_size=batch_size,
-                              shuffle=True,
-                              num_workers=num_workers)
-
-    test_set = SoundDetachedExpressInstance(path, train=False, transform = test_transform)
-
-    test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
-
-
-    return train_loader, test_loader, n_data
-
-def get_detached_mask_sound_dataloaders(path,batch_size=128, num_workers=4):
-    
-    """
-    Sound Map multi channel data with mask
-    """
-    
-    train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        transforms.Normalize((0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
+        transforms.Normalize(( 0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
     ])
     
     test_transform = transforms.Compose([
-        transforms.Normalize((0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
+        transforms.Normalize(( 0.92018, 0.99356 ,0.91374), (0.20518, 0.04393 ,0.20895)),
     ])
 
 
@@ -556,22 +533,24 @@ def get_detached_mask_sound_dataloaders(path,batch_size=128, num_workers=4):
     return train_loader, test_loader, n_data
 
 
-def get_detached_sound_noaug_dataloaders(path,batch_size=128, num_workers=4):
+def get_detached_sound_dataloaders2(path,batch_size=128, num_workers=4):
     
     """
-    Sound Map multi + expansion data, no aug version
+    Sound Map data
     """
     
     train_transform = transforms.Compose([
-        transforms.Normalize((0.93444, 0.92018, 0.99356 ,0.91374), (0.13224, 0.20518, 0.04393 ,0.20895)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.Normalize((0.03063, 0.00889), (0.08858, 0.06047)),
     ])
     
     test_transform = transforms.Compose([
-        transforms.Normalize((0.93444, 0.92018, 0.99356 ,0.91374), (0.13224, 0.20518, 0.04393 ,0.20895)),
+        transforms.Normalize((0.03063, 0.00889), (0.08858, 0.06047)),
     ])
 
 
-    train_set = SoundDetachedInstance(path,train = True, transform = train_transform)
+    train_set = SoundDetachedInstance2(path,train = True, transform = train_transform)
     n_data = len(train_set)
 
     train_loader = DataLoader(train_set,
@@ -579,7 +558,7 @@ def get_detached_sound_noaug_dataloaders(path,batch_size=128, num_workers=4):
                               shuffle=True,
                               num_workers=num_workers)
 
-    test_set = SoundDetachedInstance(path, train=False, transform = test_transform)
+    test_set = SoundDetachedInstance2(path, train=False, transform = test_transform)
 
     test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
@@ -587,3 +566,67 @@ def get_detached_sound_noaug_dataloaders(path,batch_size=128, num_workers=4):
     return train_loader, test_loader, n_data
 
 
+def get_detached_sound_dataloaders3(path,batch_size=128, num_workers=4):
+    
+    """
+    Sound Map data
+    """
+    
+    train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.Normalize((0.03063, 0.00889,0.91374), (0.08858, 0.06047,0.20895)),
+    ])
+    
+    test_transform = transforms.Compose([
+        transforms.Normalize((0.03063, 0.00889,0.91374), (0.08858, 0.06047,0.20895)),
+    ])
+
+
+    train_set = SoundDetachedInstance3(path,train = True, transform = train_transform)
+    n_data = len(train_set)
+
+    train_loader = DataLoader(train_set,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              num_workers=num_workers)
+
+    test_set = SoundDetachedInstance3(path, train=False, transform = test_transform)
+
+    test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+
+    return train_loader, test_loader, n_data
+
+
+def get_detached_two_sound_dataloaders(path,batch_size=128, num_workers=4):
+    
+    """
+    Sound Map data
+    """
+    
+    train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.Normalize(( 0.92018, 0.99356), (0.20518, 0.04393)),
+    ])
+    
+    test_transform = transforms.Compose([
+        transforms.Normalize(( 0.92018, 0.99356), (0.20518, 0.04393)),
+    ])
+
+
+    train_set = SoundDetachedTwoInstance(path,train = True, transform = train_transform)
+    n_data = len(train_set)
+
+    train_loader = DataLoader(train_set,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              num_workers=num_workers)
+
+    test_set = SoundDetachedTwoInstance(path, train=False, transform = test_transform)
+
+    test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+
+    return train_loader, test_loader, n_data
