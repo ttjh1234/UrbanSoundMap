@@ -25,7 +25,7 @@ def nse_metric(ypred,y):
 def fb_metric(ypred,y):
     true_mean = np.mean(y)
     pred_mean = np.mean(ypred)
-    fb = (2*(true_mean - pred_mean)) / (true_mean + pred_mean)
+    fb = (2*np.mean(y - ypred)) / (true_mean + pred_mean)
     return fb
 
 # MAE Metric : Mean Absolute Error
