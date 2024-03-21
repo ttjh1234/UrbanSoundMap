@@ -13,7 +13,8 @@ import wandb
 from multi_models import model_dict
 from utils.loop import train, evaluate
 from utils.util import epoch_time, adjust_learning_rate
-from UrbanSoundMap.dataset.sound import get_detached_origin_sound_dataloaders
+# from dataset.sound import get_detached_origin_sound_dataloaders
+from dataset.sound_exp import get_detached_origin_sound_dataloaders
 
 def parse_option():
 
@@ -35,7 +36,7 @@ def parse_option():
 
     # dataset
     parser.add_argument('--model', type=str, default='vgg13',
-                        choices=['vgg8','vgg11','vgg13','vgg16','vgg19','resnet18'])
+                        choices=['vgg8','vgg11','vgg13','vgg16','vgg19','resnet18','wrn_16_2','wrn_40_2'])
     parser.add_argument('--dataset', type=str, default='sound', choices=['sound',], help='dataset')
     parser.add_argument('--alpha', type=float, default=1.0, help = 'Balancing parameter')
     # Experiment
@@ -92,7 +93,7 @@ def main():
 
     # dataloader
     if opt.dataset == 'sound':
-        train_loader, val_loader, n_data= get_detached_origin_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers)
+        train_loader, val_loader, n_data= get_detached_origin_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers, seed=opt.trial)
         n_cls = 1
     else:
         raise NotImplementedError(opt.dataset)

@@ -14,6 +14,79 @@ from PIL import Image
 from scipy import interpolate
 import random
 
+region_dict= {}
+
+region_dict[0] = [[740,1895],[1285,2351]]
+region_dict[1] = [[1285,1895],[1830,2351]]
+region_dict[2] = [[1830,1895],[2375,2351]]
+region_dict[3] = [[2375,1895],[2920,2351]]
+
+region_dict[4] = [[740,1439],[1285,1895]]
+region_dict[5] = [[1285,1439],[1830,1895]]
+region_dict[6] = [[1830,1439],[2375,1895]]
+region_dict[7] = [[2375,1439],[2920,1895]]
+
+region_dict[8] = [[195,982],[740,1439]]
+region_dict[9] = [[740,982],[1285,1439]]
+region_dict[10] = [[1285,982],[1830,1439]]
+region_dict[11] = [[1830,982],[2375,1439]]
+region_dict[12] = [[2375,982],[2920,1439]]
+
+region_dict[13] = [[195,526],[740,982]]
+region_dict[14] = [[740,526],[1285,982]]
+region_dict[15] = [[1285,526],[1830,982]]
+region_dict[16] = [[1830,526],[2375,982]]
+region_dict[17] = [[2375,526],[2920,982]]
+
+region_dict[18] = [[740,70],[1285,526]]
+region_dict[19] = [[1285,70],[1830,526]]
+region_dict[20] = [[1830,70],[2375,526]]
+region_dict[21] = [[2375,70],[2920,526]]
+
+def choose_region(seed):
+    index_np = np.arange(0,22,1)
+    valid_index = np.random.choice(index_np, 7, replace=False)
+    train_index = np.delete(index_np,valid_index, axis=0)
+    train_index = np.sort(train_index)
+    valid_index = np.sort(valid_index)
+    
+    print("Seed : {}".format(seed))
+    print("Train : ", train_index)
+    print("Valid : ", valid_index)
+             
+    return train_index, valid_index
+
+def parsing_index(img10, label, coord, index, img1=None):
+    data_index = np.zeros((0,)).astype(int)
+    for i in range(index.shape[0]):
+        min_coord, max_coord = region_dict[index[i]]
+        min_x, min_y = min_coord
+        max_x, max_y = max_coord
+        if max_y == 2351:
+            if max_x == 2920:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
+            else:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
+        else:
+            if max_x == 2920:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
+            else:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
+                
+        data_index = np.concatenate([data_index, np.where(region_mask)[0]],axis=0)
+    if img1 is not None:
+        img10 = img10[data_index]
+        img1 = img1[data_index]
+        label = label[data_index]
+        coord = coord[data_index]
+        return img1, img10, label, coord
+    else:
+        img10 = img10[data_index]
+        label = label[data_index]
+        coord = coord[data_index]
+        return img10, label, coord
+
+
 # Sound Augmentation Random Horizontal Flip and Random Vertical Flip
 class SoundRandomHorizontalFlip(nn.Module):
     def __init__(self, p=0.5):
@@ -51,7 +124,7 @@ class SoundRandomVerticalFlip(nn.Module):
  
 class SoundInstance(Dataset):
     # Single Channel Dataset 10m x 10m resolution
-    def __init__(self, path, train=True, transform=None,target_transform=None):
+    def __init__(self, path, index_set, train=True, transform=None,target_transform=None):
 
         self.transform=transform
         self.target_transform=target_transform

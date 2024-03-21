@@ -22,7 +22,8 @@ import wandb
 from models import model_dict
 from utils.loop import train, evaluate
 from utils.util import epoch_time, adjust_learning_rate
-from UrbanSoundMap.dataset.sound import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders
+#from dataset.sound import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders
+from dataset.sound_exp import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders
 
 def parse_option():
 
@@ -112,13 +113,13 @@ def main():
 
     # dataloader
     if opt.aug_type == 'No_aug':
-        train_loader, val_loader, n_data= get_no_aug_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers)
+        train_loader, val_loader, n_data= get_no_aug_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed= opt.trial)
         n_cls = 1    
     elif opt.aug_type == 'Aug':
-        train_loader, val_loader, n_data= get_aug_crop_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers)
+        train_loader, val_loader, n_data= get_aug_crop_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed= opt.trial)
         n_cls = 1
     elif opt.aug_type == 'Aug_eff':
-        train_loader, val_loader, n_data= get_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers)
+        train_loader, val_loader, n_data= get_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed= opt.trial)
         n_cls = 1
     else:
         raise NotImplementedError(opt.dataset)
@@ -140,8 +141,7 @@ def main():
         model = model.to(opt.device)
         criterion = criterion.to(opt.device)
     
-    patient = 5
-    n_patient = 0    
+
     # routine
     for epoch in range(1, opt.epochs + 1):
         
@@ -162,11 +162,7 @@ def main():
         if valid_rmse < best_loss:
             best_loss = valid_rmse
             torch.save(model.state_dict(), './assets/aug_exp_model/{}-{}-{}-{}-{}.pt'.format(opt.aug_type,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
-            n_patient = 0
-        else:
-            n_patient += 1
-            if patient < n_patient:
-                break
+
 
         if math.isnan(train_loss):
             break

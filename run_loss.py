@@ -11,10 +11,10 @@ import math
 import wandb
 
 from four_models import model_dict
-from utils.loop import train, evaluate
+from utils.loop import train, evaluate, train_weighted, evaluate_weighted
+from utils.loss import weighted_loss, weighted_loss2
 from utils.util import epoch_time, adjust_learning_rate
-#from dataset.sound import get_detached_sound_dataloaders, get_detached_mask_sound_dataloaders
-from dataset.sound_exp import get_detached_sound_dataloaders, get_detached_mask_sound_dataloaders
+from dataset.sound_exp import get_detached_sound_dataloaders, get_detached_weighted_sound_dataloaders
 
 def parse_option():
 
@@ -33,6 +33,9 @@ def parse_option():
     parser.add_argument('--lr_decay_rate', type=float, default=0.05, help='decay rate for learning rate')
     parser.add_argument('--weight_decay', type=float, default=1e-4, help='weight decay') # default 5e-4
     parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
+    parser.add_argument('--loss_type', type=str, default='mse', help='loss type')
+    parser.add_argument('--threshold', type=float, default=40.0, help='momentum')
+    parser.add_argument('--sample_weight', type=float, default=2.0, help='momentum')
 
     # dataset
     parser.add_argument('--model', type=str, default='vgg13',
@@ -82,8 +85,9 @@ def main():
     
     if opt.run_flag==1:
         wandb.init(
-            project="sound_prediction_expand".format(opt.dataset),
-            name="four-{}-{}-{}-{}-Baseline".format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
+            project="sound_prediction_loss".format(opt.dataset),
+            name="{}-{}-{}-{}-{}-{}-{}-Baseline".format(opt.loss_type,int(opt.threshold),int(opt.sample_weight),
+                                                        opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
             config={
                 "optimizer" : opt.optimizer,
                 "learning_rate" : opt.learning_rate,
@@ -100,8 +104,8 @@ def main():
 
     # dataloader
     if opt.dataset == 'sound':
-        if opt.model in ['mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19']:
-            train_loader, val_loader, n_data= get_detached_mask_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
+        if opt.loss_type == 'both':
+            train_loader, val_loader, n_data= get_detached_weighted_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
             n_cls = 1        
         else:
             train_loader, val_loader, n_data= get_detached_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
@@ -135,11 +139,20 @@ def main():
     else:
         raise NotImplementedError(opt.optimizer)
 
-    criterion = nn.MSELoss()
+    if opt.loss_type == 'mse':
+        criterion = nn.MSELoss()
+        eval_criterion= nn.MSELoss()
+    elif opt.loss_type =='weighted':
+        criterion = weighted_loss(opt.threshold,opt.sample_weight)
+        eval_criterion= nn.MSELoss()
+    elif opt.loss_type == 'both':
+        criterion = weighted_loss2(opt.sample_weight)
+        eval_criterion= nn.MSELoss()
 
     if torch.cuda.is_available():
         model = model.to(opt.device)
         criterion = criterion.to(opt.device)
+        eval_criterion= eval_criterion.to(opt.device)
          
         
     # routine
@@ -148,9 +161,9 @@ def main():
         adjust_learning_rate(epoch, opt, optimizer)
         
         start_time = time.time()
-        if opt.model in ['mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19']:
-            train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
-            valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
+        if opt.loss_type == 'both':
+            train_loss, train_rmse = train_weighted(model, train_loader, optimizer, criterion, opt.device, run)
+            valid_loss, valid_rmse = evaluate_weighted(model, val_loader, eval_criterion, opt.device, run)
         else:
             train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
             valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
@@ -165,7 +178,13 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/model/four-{}-{}-{}-{}.pt'.format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
+            torch.save(model.state_dict(), './assets/model/{}-{}-{}-{}-{}-{}-{}.pt'.format(opt.loss_type,
+                                                                                           opt.threshold,
+                                                                                           opt.sample_weight,                                                                                           
+                                                                                           opt.model,
+                                                                                           opt.optimizer,
+                                                                                           int(1000*opt.learning_rate),
+                                                                                           opt.trial))
 
         if math.isnan(train_loss):
             break

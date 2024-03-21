@@ -9,9 +9,9 @@ import torch.backends.cudnn as cudnn
 import math
 
 import wandb
-
+from utils.loss import point_and_quantile_loss
 from four_models import model_dict
-from utils.loop import train, evaluate
+from utils.loop import train_quantile, evaluate_quantile
 from utils.util import epoch_time, adjust_learning_rate
 #from dataset.sound import get_detached_sound_dataloaders, get_detached_mask_sound_dataloaders
 from dataset.sound_exp import get_detached_sound_dataloaders, get_detached_mask_sound_dataloaders
@@ -45,6 +45,13 @@ def parse_option():
                                  'groupvgg8','groupvgg11','groupvgg13','groupvgg16','groupvgg19',
                                  'groupvgg8_2','groupvgg11_2','groupvgg13_2','groupvgg16_2','groupvgg19_2',])
     parser.add_argument('--dataset', type=str, default='sound', choices=['sound',], help='dataset')
+    
+    
+    # Loss
+    parser.add_argument('--weight0', type=float, default=1/3, help='Weight of RMSE')
+    parser.add_argument('--weight1', type=float, default=1/3, help='Weight of Upper Quantile')
+    parser.add_argument('--weight2', type=float, default=1/3, help='Weight of Lower Quantile')
+    parser.add_argument('--upper', type=float, default=0.975, help='Upper Percentile')
 
     # Experiment
     parser.add_argument('--trial', type=int, default=0, help='the experiment id')
@@ -82,7 +89,7 @@ def main():
     
     if opt.run_flag==1:
         wandb.init(
-            project="sound_prediction_expand".format(opt.dataset),
+            project="sound_prediction_quantile".format(opt.dataset),
             name="four-{}-{}-{}-{}-Baseline".format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
             config={
                 "optimizer" : opt.optimizer,
@@ -102,10 +109,10 @@ def main():
     if opt.dataset == 'sound':
         if opt.model in ['mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19']:
             train_loader, val_loader, n_data= get_detached_mask_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
-            n_cls = 1        
+            n_cls = 3        
         else:
             train_loader, val_loader, n_data= get_detached_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
-            n_cls = 1
+            n_cls = 3
     else:
         raise NotImplementedError(opt.dataset)
 
@@ -135,7 +142,7 @@ def main():
     else:
         raise NotImplementedError(opt.optimizer)
 
-    criterion = nn.MSELoss()
+    criterion = point_and_quantile_loss(opt.weight0, opt.weight1, opt.weight2, opt.upper)
 
     if torch.cuda.is_available():
         model = model.to(opt.device)
@@ -148,12 +155,8 @@ def main():
         adjust_learning_rate(epoch, opt, optimizer)
         
         start_time = time.time()
-        if opt.model in ['mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19']:
-            train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
-            valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
-        else:
-            train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
-            valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
+        train_loss, train_rmse = train_quantile(model, train_loader, optimizer, criterion, opt.device, run)
+        valid_loss, valid_rmse = evaluate_quantile(model, val_loader, criterion, opt.device, run)
         end_time = time.time()
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
         
@@ -165,7 +168,7 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/model/four-{}-{}-{}-{}.pt'.format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
+            torch.save(model.state_dict(), './assets/model/quantile-{}-{}-{}-{}.pt'.format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
 
         if math.isnan(train_loss):
             break

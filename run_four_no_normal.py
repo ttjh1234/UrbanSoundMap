@@ -14,7 +14,7 @@ from four_models import model_dict
 from utils.loop import train, evaluate
 from utils.util import epoch_time, adjust_learning_rate
 #from dataset.sound import get_detached_sound_dataloaders, get_detached_mask_sound_dataloaders
-from dataset.sound_exp import get_detached_sound_dataloaders, get_detached_mask_sound_dataloaders
+from dataset.sound_exp_normal import get_detached_sound_dataloaders
 
 def parse_option():
 
@@ -83,7 +83,7 @@ def main():
     if opt.run_flag==1:
         wandb.init(
             project="sound_prediction_expand".format(opt.dataset),
-            name="four-{}-{}-{}-{}-Baseline".format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
+            name="No_Normal_four-{}-{}-{}-{}-Baseline".format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
             config={
                 "optimizer" : opt.optimizer,
                 "learning_rate" : opt.learning_rate,
@@ -99,13 +99,9 @@ def main():
     set_random_seed(opt.trial)
 
     # dataloader
-    if opt.dataset == 'sound':
-        if opt.model in ['mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19']:
-            train_loader, val_loader, n_data= get_detached_mask_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
-            n_cls = 1        
-        else:
-            train_loader, val_loader, n_data= get_detached_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
-            n_cls = 1
+    if opt.dataset == 'sound':        
+        train_loader, val_loader, n_data= get_detached_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
+        n_cls = 1
     else:
         raise NotImplementedError(opt.dataset)
 
@@ -147,13 +143,9 @@ def main():
         
         adjust_learning_rate(epoch, opt, optimizer)
         
-        start_time = time.time()
-        if opt.model in ['mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19']:
-            train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
-            valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
-        else:
-            train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
-            valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
+        start_time = time.time()        
+        train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
+        valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
         end_time = time.time()
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
         
@@ -165,7 +157,7 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/model/four-{}-{}-{}-{}.pt'.format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
+            torch.save(model.state_dict(), './assets/model/no_normal-four-{}-{}-{}-{}.pt'.format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
 
         if math.isnan(train_loss):
             break

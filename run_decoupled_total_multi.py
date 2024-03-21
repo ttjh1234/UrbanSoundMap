@@ -10,11 +10,11 @@ import math
 
 import wandb
 
-from four_models import model_dict
+from multi_models import model_dict
 from utils.loop import train, evaluate
 from utils.util import epoch_time, adjust_learning_rate
-#from dataset.sound import get_detached_sound_dataloaders, get_detached_mask_sound_dataloaders
-from dataset.sound_exp import get_detached_sound_dataloaders, get_detached_mask_sound_dataloaders
+# from dataset.sound import get_detached_origin_sound_dataloaders
+from dataset.sound_hdf5 import get_detached_origin_sound_dataloaders
 
 def parse_option():
 
@@ -36,16 +36,9 @@ def parse_option():
 
     # dataset
     parser.add_argument('--model', type=str, default='vgg13',
-                        choices=['resnet18','vgg8','vgg11','vgg13','vgg16','vgg19','wrn_16_2','wrn_40_2',
-                                 'vgg8act','vgg11act','vgg13act','vgg16act','vgg19act',
-                                 'resnet8','resnet14','resnet20','resnet32',
-                                 'vgg8fuse2','vgg11fuse2','vgg13fuse2','vgg16fuse2','vgg19fuse2',
-                                 'myvgg8','myvgg11','myvgg13','myvgg16','myvgg19',
-                                 'mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19',
-                                 'groupvgg8','groupvgg11','groupvgg13','groupvgg16','groupvgg19',
-                                 'groupvgg8_2','groupvgg11_2','groupvgg13_2','groupvgg16_2','groupvgg19_2',])
+                        choices=['vgg8','vgg11','vgg13','vgg16','vgg19','resnet18','wrn_16_2','wrn_40_2'])
     parser.add_argument('--dataset', type=str, default='sound', choices=['sound',], help='dataset')
-
+    parser.add_argument('--alpha', type=float, default=1.0, help = 'Balancing parameter')
     # Experiment
     parser.add_argument('--trial', type=int, default=0, help='the experiment id')
     parser.add_argument('--run_flag', type=int, default=0, help='run_flag')    
@@ -68,8 +61,8 @@ def parse_option():
 
 def set_random_seed(seed):
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
+    #torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # if use multi-GPU
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
@@ -82,14 +75,15 @@ def main():
     
     if opt.run_flag==1:
         wandb.init(
-            project="sound_prediction_expand".format(opt.dataset),
-            name="four-{}-{}-{}-{}-Baseline".format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
+            project="sound_prediction_total".format(opt.dataset),
+            name="Multi-Decoupled-{}-{}-{}-{}-{}-Baseline".format(opt.batch_size,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
             config={
                 "optimizer" : opt.optimizer,
                 "learning_rate" : opt.learning_rate,
                 "model" : opt.model,
                 "trial_num" : opt.trial,
                 "dataset" : opt.dataset,
+                "batchsize" : opt.batch_size
             }
         )
         run=1
@@ -100,12 +94,8 @@ def main():
 
     # dataloader
     if opt.dataset == 'sound':
-        if opt.model in ['mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19']:
-            train_loader, val_loader, n_data= get_detached_mask_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
-            n_cls = 1        
-        else:
-            train_loader, val_loader, n_data= get_detached_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
-            n_cls = 1
+        train_loader, val_loader, n_data= get_detached_origin_sound_dataloaders(path='./assets/total_data/',batch_size=opt.batch_size, num_workers= opt.num_workers, seed=opt.trial)
+        n_cls = 1
     else:
         raise NotImplementedError(opt.dataset)
 
@@ -140,7 +130,6 @@ def main():
     if torch.cuda.is_available():
         model = model.to(opt.device)
         criterion = criterion.to(opt.device)
-         
         
     # routine
     for epoch in range(1, opt.epochs + 1):
@@ -148,12 +137,8 @@ def main():
         adjust_learning_rate(epoch, opt, optimizer)
         
         start_time = time.time()
-        if opt.model in ['mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19']:
-            train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
-            valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
-        else:
-            train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
-            valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
+        train_loss, train_rmse = train(model, train_loader, optimizer, criterion, opt.device, run)
+        valid_loss, valid_rmse = evaluate(model, val_loader, criterion, opt.device, run)
         end_time = time.time()
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
         
@@ -165,7 +150,7 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/model/four-{}-{}-{}-{}.pt'.format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
+            torch.save(model.state_dict(), './assets/total_model/multi-decoupled-{}-{}-{}-{}-{}.pt'.format(opt.batch_size,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
 
         if math.isnan(train_loss):
             break
@@ -175,8 +160,9 @@ def main():
                        "train/epoch_rmse": train_rmse, 
                         "valid/epoch_loss" : valid_loss,
                         "valid/epoch_rmse" : valid_rmse,
-                        "valid/Best_RMSE" : best_loss})    
-    
+                        "valid/Best_RMSE" : best_loss})   
+
+
     wandb.finish()
 
 

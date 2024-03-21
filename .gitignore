@@ -15,3 +15,5 @@ wandb
 tryto2.py
 old_process
 printout
+run_test.py
+test_models
