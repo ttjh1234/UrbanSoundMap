@@ -19,6 +19,7 @@ import time
 import math
 import h5py
 import joblib 
+from dataset.sound_exp import choose_region, parsing_index
 
 region_dict= {}
 
@@ -49,40 +50,6 @@ region_dict[19] = [[1285,70],[1830,526]]
 region_dict[20] = [[1830,70],[2375,526]]
 region_dict[21] = [[2375,70],[2920,526]]
 
-def choose_region(seed):
-    index_np = np.arange(0,22,1)
-    valid_index = np.random.choice(index_np, 7, replace=False)
-    train_index = np.delete(index_np,valid_index, axis=0)
-    train_index = np.sort(train_index)
-    valid_index = np.sort(valid_index)
-    
-    print("Seed : {}".format(seed))
-    print("Train : ", train_index)
-    print("Valid : ", valid_index)
-             
-    return train_index, valid_index
-
-def parsing_index(data,label, coord, index):
-    data_index = np.zeros((0,)).astype(int)
-    for i in range(index.shape[0]):
-        min_coord, max_coord = region_dict[index[i]]
-        min_x, min_y = min_coord
-        max_x, max_y = max_coord
-        if max_y == 2351:
-            if max_x == 2920:
-                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
-            else:
-                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
-        else:
-            if max_x == 2920:
-                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
-            else:
-                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
-                
-        data_index = np.concatenate([data_index, np.where(region_mask)[0]],axis=0)
-
-    return data[data_index], label[data_index]
-
 def set_random_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -95,8 +62,7 @@ def set_random_seed(seed):
 def parse_option():
 
     parser = argparse.ArgumentParser('argument for training')
-    parser.add_argument('--resolution', type=int, default=1000, choices=[150,200,250,1000],help='resolution')
-    parser.add_argument('--method', type=str, default='full', choices=['full','pool2','pool4','pool5','pool8','pool10','pool20'],help='resolution')
+    parser.add_argument('--method', type=str, default='sigle', choices=['single','two'],help='Method')
     parser.add_argument('--seed', type=int, default=0,help='seed')
 
     opt = parser.parse_args()
@@ -104,7 +70,6 @@ def parse_option():
     return opt
 
 def main():
-    
     opt = parse_option()
     
     tcord= np.load('./assets/newdata/train_coord.npy')
@@ -119,55 +84,90 @@ def main():
     del t_target
     del v_target
 
-    urban_path = './assets/newdata/urbanform{}{}.h5py'.format(opt.resolution,opt.method)
-    file_object = h5py.File(urban_path, 'r')
-    rep_var = np.array(file_object['data'])
-    
-    #cord = np.delete(cord, remove_ind, axis=0)
-    #target = np.delete(target, remove_ind, axis=0)
-    
+    if opt.method == 'single':
+        t_img = np.load('./assets/newdata/train_img10.npy')
+        v_img = np.load('./assets/newdata/test_img10.npy')
+        img = np.concatenate([t_img,v_img],axis=0)
+        del t_img
+        del v_img
+        set_random_seed(opt.seed)
+        tr_idx, va_idx = choose_region(opt.seed)
+        trainset, train_label, _ = parsing_index(img, target, cord, tr_idx)
+        validset, valid_label, _ = parsing_index(img, target, cord, va_idx)
+        trainset = trainset.reshape(train_label.shape[0],-1)
+        validset = validset.reshape(valid_label.shape[0],-1)
+        del img
+        del target
+        del cord
+        del tr_idx
+        del va_idx
+
+    elif opt.method == 'two':
+        t_img = np.load('./assets/newdata/train_img10.npy')
+        v_img = np.load('./assets/newdata/test_img10.npy')
+        t_img1 = np.load('./assets/newdata/train_img1.npy')
+        v_img1 = np.load('./assets/newdata/test_img1.npy')
+        img10 = np.concatenate([t_img,v_img],axis=0)
+        del t_img
+        del v_img
+        img1 = np.concatenate([t_img1,v_img1],axis=0)
+        del t_img1
+        del v_img1
+        set_random_seed(opt.seed)
+        tr_idx, va_idx = choose_region(opt.seed)
+        trainset1,trainset10, train_label,_ = parsing_index(img10, target, cord, tr_idx, img1)
+        validset1,validset10, valid_label,_ = parsing_index(img10, target, cord, va_idx, img1)
+        del target
+        del img10
+        del img1
+        del cord
+        del tr_idx
+        del va_idx
+        trainset1 = trainset1.reshape(train_label.shape[0],-1)
+        validset1 = validset1.reshape(valid_label.shape[0],-1)
+        trainset10 = trainset10.reshape(train_label.shape[0],-1)
+        validset10 = validset10.reshape(valid_label.shape[0],-1)
+        trainset = np.concatenate([trainset1,trainset10],axis=1)
+        validset = np.concatenate([validset1,validset10],axis=1)
+        del trainset1
+        del trainset10
+        del validset1
+        del validset10
+    else:
+        raise NotImplementedError()
+
     result_dict = {}
     for mname in ['linear','cb','dt','xgb','lgbm']:
         result_dict[mname] = {}
-        for met in ['rmse','nmse','nse','fb','mae']:
+        for met in ['rmse','nse','mae']:
             result_dict[mname][met] = 0
 
-
-    set_random_seed(opt.seed)
-    tr_idx, va_idx = choose_region(opt.seed)
-    trainset, _ = parsing_index(rep_var,target, cord, tr_idx)
-    validset, valid_label = parsing_index(rep_var,target, cord, va_idx)
-    del rep_var
-    del cord
-    del target
-    
     
     SS = StandardScaler()
     _ = SS.fit_transform(trainset)
     ss_valid = SS.transform(validset)
-    
     del trainset
+    del validset
+    
 
-    for model_name in ['linear','cb','dt','xgb','lgbm']:    
+    for model_name in ['linear','dt','lgbm','xgb','cb']:    
         print("-----------------------")
         print("Model : ",model_name)
         print("Method : ",opt.method)
         print("Seed : ",opt.seed)    
         print("-----------------------")
         
-        model1 = joblib.load('./assets/ml_model/{}_1000_{}-{}.pkl'.format(model_name,opt.method,opt.seed))
+        model1 = joblib.load('./assets/ml_model/{}_{}-{}.pkl'.format(model_name,opt.method,opt.seed))
         pred1 = model1.predict(ss_valid)
         
         result_dict[model_name]['rmse'] = rmse_metric(pred1, valid_label)
-        result_dict[model_name]['nmse'] = nmse_metric(pred1, valid_label)
         result_dict[model_name]['nse'] = nse_metric(pred1, valid_label)
-        result_dict[model_name]['fb'] = fb_metric(pred1, valid_label)
         result_dict[model_name]['mae'] = mae_metric(pred1, valid_label)
     
     result_base = pd.DataFrame(result_dict).T
-    result_base.columns =  ['rmse','nmse','nse','fb','mae']
+    result_base.columns =  ['rmse','nse','mae']
 
-    result_base.to_csv('./assets/ml_exp_result/result_{}.csv'.format(opt.seed))
+    result_base.to_csv('./assets/ml_exp_result/result_{}_{}.csv'.format(opt.method,opt.seed))
         
     
 

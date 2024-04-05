@@ -1247,6 +1247,42 @@ def get_aug_crop_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0):
 
     return train_loader, test_loader, n_data
 
+def get_aug_rotate_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0):
+    
+    """
+    Sound Map data not efficient aug Experiment for single channel dataset
+    """
+    train_idx, valid_idx = choose_region(seed)
+    train_transform = transforms.Compose([
+        transforms.RandomRotation(30),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        #transforms.Normalize((0.90865), (0.21802)),
+    ])
+    
+    # test_transform = transforms.Compose([
+    #     #transforms.Normalize((0.90865), (0.21802)),
+    # ])
+
+
+    train_set = SoundInstance(path, train_idx, transform = train_transform)
+    n_data = len(train_set)
+    t_mean = train_set.mean_value
+    t_std = train_set.std_value
+    
+
+    train_loader = DataLoader(train_set,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              num_workers=num_workers)
+
+    test_set = SoundInstance(path, valid_idx, t_mean=t_mean, t_std = t_std)
+
+    test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+
+    return train_loader, test_loader, n_data
+
 def get_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0):
     
     """

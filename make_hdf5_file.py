@@ -168,6 +168,17 @@ def check_duplicated(img1, img10, coord, label, opt, dataset = 'Train'):
 def normalize_pixel_value(img):
     return img / 255.0
 
+def check_over_label(img1,img10,label,coord):
+    over_index = np.where(label==1000)[0]
+
+    img1 = np.delete(img1, over_index, axis=0)
+    img10 = np.delete(img10, over_index, axis=0)
+    label = np.delete(label, over_index, axis=0)
+    coord = np.delete(coord, over_index, axis=0)
+
+    return img1, img10, label, coord
+
+
 def set_random_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)

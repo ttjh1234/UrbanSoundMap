@@ -29,6 +29,16 @@ def check_negative_label(img1, img10, coord, label, dataset = 'Train'):
     else:
         return img1, img10, coord, label
     
+def check_over_label(img1,img10,label,coord):
+    over_index = np.where(label==1000)[0]
+
+    img1 = np.delete(img1, over_index, axis=0)
+    img10 = np.delete(img10, over_index, axis=0)
+    label = np.delete(label, over_index, axis=0)
+    coord = np.delete(coord, over_index, axis=0)
+
+    return img1, img10, label, coord
+    
 def read_matfile_and_split(mat_file_path):
     '''
     Matfile includes each dataset's 1mx1m image, 10mx10m image, coordinate, label
@@ -44,6 +54,8 @@ def read_matfile_and_split(mat_file_path):
     total_img1 = total_img1.transpose(2,0,1)
     total_img10 = np.where(total_img10==0,255,total_img10)
     total_img1 = np.where(total_img1==0,255,total_img1)
+ 
+    total_img1, total_img10, total_label, total_cord =check_over_label(total_img1, total_img10, total_label, total_cord)
  
     return total_img1, total_img10, total_cord, total_label
 

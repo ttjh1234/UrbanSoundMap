@@ -23,7 +23,7 @@ from models import model_dict
 from utils.loop import train, evaluate
 from utils.util import epoch_time, adjust_learning_rate
 #from dataset.sound import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders
-from dataset.sound_exp import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders
+from dataset.sound_exp import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders,get_aug_rotate_sound_dataloaders
 
 def parse_option():
 
@@ -47,7 +47,7 @@ def parse_option():
     # dataset
     parser.add_argument('--model', type=str, default='vgg13',
                         choices=['vgg8','vgg11','vgg13','vgg16','vgg19',
-                                 'wrn_16_2','wrn_40_2','resnet18','resnet50','resnet34','inception_resnetv2_2'])
+                                 'wrn_16_2','wrn_40_2','resnet18','resnet50','resnet34','inception_resnetv2_2','MobileNetV2'])
     parser.add_argument('--dataset', type=str, default='sound', choices=['sound',], help='dataset')
 
     # Experiment
@@ -67,6 +67,8 @@ def parse_option():
         opt.aug_type = 'Aug'
     elif opt.aug_type == 2:
         opt.aug_type = 'Aug_eff'
+    elif opt.aug_type == 3:
+        opt.aug_type = 'Aug_rotate'
     else:
         raise NotImplementedError(opt.aug_type)
     
@@ -117,6 +119,9 @@ def main():
         n_cls = 1    
     elif opt.aug_type == 'Aug':
         train_loader, val_loader, n_data= get_aug_crop_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed= opt.trial)
+        n_cls = 1
+    elif opt.aug_type == 'Aug_rotate':
+        train_loader, val_loader, n_data= get_aug_rotate_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed= opt.trial)
         n_cls = 1
     elif opt.aug_type == 'Aug_eff':
         train_loader, val_loader, n_data= get_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed= opt.trial)
