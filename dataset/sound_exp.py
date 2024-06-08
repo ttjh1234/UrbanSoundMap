@@ -231,6 +231,7 @@ class SoundExpansionInstance(Dataset):
 
         return img, target, index
 
+
 class SoundBaseExpandInstance(Dataset):
     # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
     def __init__(self, path, index_set, t_mean=None, t_std = None,transform=None,target_transform=None):
@@ -1176,6 +1177,142 @@ class SoundTwoValidInstance(Dataset):
         return img, target, index
 
 
+class SoundTotalInstance(Dataset):
+    # Single Channel Dataset 10m x 10m resolution
+    def __init__(self, path, t_mean=None, t_std = None, transform=None, target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+
+        self.train_img=np.load(path+'/train_img10.npy')
+        self.train_label=np.load(path+'/train_label.npy')
+        self.train_coord=np.load(path+'/train_coord.npy')    
+        self.test_img=np.load(path+'/test_img10.npy')
+        self.test_label=np.load(path+'/test_label.npy')
+        self.test_coord=np.load(path+'/test_coord.npy')    
+        
+        self.origin_img = np.concatenate([self.train_img,self.test_img],axis=0)
+        self.label = np.concatenate([self.train_label,self.test_label],axis=0)
+        self.coord = np.concatenate([self.train_coord,self.test_coord],axis=0)
+        
+        del self.train_img
+        del self.train_label
+        del self.test_img
+        del self.train_coord
+        del self.test_label
+        del self.test_coord
+        
+        self.mean_value = t_mean
+        self.std_value = t_std
+        
+    def get_mean_var(self):
+        mean_value = np.mean(np.mean(self.origin_img,axis=(1,2)))
+        std_value = np.mean(np.std(self.origin_img,axis=(1,2)))
+
+        return mean_value, std_value
+    
+    def normalizing(self, x):
+        return (x - self.mean_value)/self.std_value
+        
+    
+    def __len__(self):
+        return self.origin_img.shape[0]
+
+    def __getitem__(self, index):
+
+        img=torch.tensor(self.origin_img[index],dtype=torch.float).unsqueeze(0)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+        coord=torch.tensor(self.coord[index],dtype=torch.long)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        img = self.normalizing(img)
+
+        return img, target, coord
+    
+class SoundTotalTwoInstance(Dataset):
+    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
+    def __init__(self, path, t_mean=None, t_std = None,transform=None,target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+        
+        self.train_img10=np.load(path+'/train_img10.npy')
+        self.train_img1=np.load(path+'/train_img1.npy')
+        self.train_label=np.load(path+'/train_label.npy')
+        self.train_coord=np.load(path+'/train_coord.npy')    
+        self.test_img10=np.load(path+'/test_img10.npy')
+        self.test_img1=np.load(path+'/test_img1.npy')
+        self.test_label=np.load(path+'/test_label.npy')
+        self.test_coord=np.load(path+'/test_coord.npy')    
+        
+        self.expansion_img = np.concatenate([self.train_img1,self.test_img1],axis=0)
+        del self.train_img1
+        del self.test_img1
+
+        self.origin_img = np.concatenate([self.train_img10,self.test_img10],axis=0)
+        del self.train_img10
+        del self.test_img10
+
+        self.label = np.concatenate([self.train_label,self.test_label],axis=0)
+        self.coord = np.concatenate([self.train_coord,self.test_coord],axis=0)
+
+        del self.train_label
+        del self.train_coord
+        del self.test_label
+        del self.test_coord
+
+        self.mean_value = t_mean
+        self.std_value = t_std
+            
+    def __len__(self):
+        return self.origin_img.shape[0]
+
+
+    def get_mean_var(self):
+        # 3 channel         
+        mean_value0 = np.mean(np.mean(self.expansion_img,axis=(1,2)))
+        std_value0 = np.mean(np.std(self.expansion_img,axis=(1,2)))
+        
+        mean_value1 = np.mean(np.mean(self.origin_img,axis=(1,2)))
+        std_value1 = np.mean(np.std(self.origin_img,axis=(1,2)))
+
+        mean_vec = torch.tensor((mean_value0,mean_value1),dtype=torch.float).unsqueeze(1).unsqueeze(1)
+        std_vec = torch.tensor((std_value0,std_value1),dtype=torch.float).unsqueeze(1).unsqueeze(1)
+
+        return mean_vec, std_vec
+
+    def normalizing(self, x):
+        return (x - self.mean_value)/self.std_value
+
+
+    def __getitem__(self, index):
+        one_img = self.origin_img[index].reshape(1,100,100)
+        expansion_img = self.expansion_img[index].reshape(1,100,100) 
+
+        origin_img=torch.tensor(one_img,dtype=torch.float)
+        expansion_img=torch.tensor(expansion_img,dtype=torch.float)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+        coord=torch.tensor(self.coord[index],dtype=torch.long)
+
+        img = torch.cat([expansion_img, origin_img],dim=0)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        
+        img = self.normalizing(img)
+        
+        return img, target, coord
+
+
+
 
 def get_no_aug_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0):
     
@@ -1833,3 +1970,32 @@ def get_mean_std_datached_origin(path,seed=0):
 
     return t_mean, t_std
 
+def get_sound_total_dataloaders(path,batch_size=128, mean_vec = None, std_vec = None, num_workers=4):
+    
+    """
+    Sound Map data efficient aug Experiment for single channel dataset
+    """
+ 
+    valid_set = SoundTotalInstance(path,mean_vec, std_vec)
+
+    valid_loader = DataLoader(valid_set,
+                              batch_size=batch_size,
+                              shuffle=False,
+                              num_workers=num_workers)
+
+    return valid_loader
+
+def get_sound_two_total_dataloaders(path,batch_size=128, mean_vec = None, std_vec = None, num_workers=4):
+    
+    """
+    Sound Map data efficient aug Experiment for single channel dataset
+    """
+ 
+    valid_set = SoundTotalTwoInstance(path,mean_vec, std_vec)
+
+    valid_loader = DataLoader(valid_set,
+                              batch_size=batch_size,
+                              shuffle=False,
+                              num_workers=num_workers)
+
+    return valid_loader

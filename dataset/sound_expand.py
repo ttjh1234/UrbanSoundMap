@@ -140,6 +140,94 @@ def parsing_index_four(eximg1, eximg2, eximg3, img10, label, coord, index):
     coord = coord[data_index]
     return eximg1, eximg2, eximg3, img10, label, coord
 
+def parsing_index_valid(img10, label, coord, index, check_img, img1=None):
+    data_index = np.zeros((0,)).astype(int)
+    for i in range(index.shape[0]):
+        min_coord, max_coord = region_dict[index[i]]
+        min_x, min_y = min_coord
+        max_x, max_y = max_coord
+        if max_y == 2351:
+            if max_x == 2920:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
+            else:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
+        else:
+            if max_x == 2920:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
+            else:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
+                
+        data_index = np.concatenate([data_index, np.where(region_mask)[0]],axis=0)
+    if img1 is not None:
+        img10 = img10[data_index]
+        img1 = img1[data_index]
+        label = label[data_index]
+        coord = coord[data_index]
+        check_img = check_img[data_index]
+        return img1, img10, label, coord, check_img
+    else:
+        img10 = img10[data_index]
+        label = label[data_index]
+        coord = coord[data_index]
+        check_img = check_img[data_index]
+        return img10, label, coord, check_img
+
+
+def parsing_index_multi_valid(eximg1, eximg2, img10, label, coord, index, check_img):
+    data_index = np.zeros((0,)).astype(int)
+    for i in range(index.shape[0]):
+        min_coord, max_coord = region_dict[index[i]]
+        min_x, min_y = min_coord
+        max_x, max_y = max_coord
+        if max_y == 2351:
+            if max_x == 2920:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
+            else:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
+        else:
+            if max_x == 2920:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
+            else:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
+                
+        data_index = np.concatenate([data_index, np.where(region_mask)[0]],axis=0)
+
+    img10 = img10[data_index]
+    eximg1 = eximg1[data_index]
+    eximg2 = eximg2[data_index]
+    label = label[data_index]
+    coord = coord[data_index]
+    check_img = check_img[data_index]
+    return eximg1,eximg2, img10, label, coord, check_img
+
+def parsing_index_four_valid(eximg1, eximg2, eximg3, img10, label, coord, index, check_img):
+    data_index = np.zeros((0,)).astype(int)
+    for i in range(index.shape[0]):
+        min_coord, max_coord = region_dict[index[i]]
+        min_x, min_y = min_coord
+        max_x, max_y = max_coord
+        if max_y == 2351:
+            if max_x == 2920:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
+            else:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<=max_y))
+        else:
+            if max_x == 2920:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<=max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
+            else:
+                region_mask = ((coord[:,0]>=min_x) & (coord[:,0]<max_x)) & ((coord[:,1]>=min_y) & (coord[:,1]<max_y))
+                
+        data_index = np.concatenate([data_index, np.where(region_mask)[0]],axis=0)
+
+    img10 = img10[data_index]
+    eximg1 = eximg1[data_index]
+    eximg2 = eximg2[data_index]
+    eximg3 = eximg3[data_index]
+    label = label[data_index]
+    coord = coord[data_index]
+    check_img = check_img[data_index]
+    return eximg1, eximg2, eximg3, img10, label, coord, check_img
+
 
 # Sound Augmentation Random Horizontal Flip and Random Vertical Flip
 class SoundRandomHorizontalFlip(nn.Module):
@@ -495,7 +583,7 @@ class SoundFourChannelInstance(Dataset):
     
 class SoundFourValidInstance(Dataset):
     # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
-    def __init__(self, path, index_set, expansion_list, t_mean=None, t_std = None,atype='total',transform=None,target_transform=None):
+    def __init__(self, path, index_set, expansion_list, trainset=True, t_mean=None, t_std = None,atype='total',transform=None,target_transform=None):
 
         self.path = path
         self.transform=transform
@@ -506,7 +594,7 @@ class SoundFourValidInstance(Dataset):
         self.train_coord=np.load(path+'/train_coord.npy')    
         self.test_img10=np.load(path+'/test_img10.npy')
         self.test_label=np.load(path+'/test_label.npy')
-        self.test_coord=np.load(path+'/test_coord.npy')    
+        self.test_coord=np.load(path+'/test_coord.npy')
         
         
         self.total_img = np.concatenate([self.train_img10,self.test_img10],axis=0)
@@ -520,14 +608,27 @@ class SoundFourValidInstance(Dataset):
         del self.train_coord
         del self.test_label
         del self.test_coord
+        
+        self.t_check_img = np.load(path+'/train_img1.npy')
+        self.v_check_img = np.load(path+'/test_img1.npy')
+        self.check_img = np.concatenate([self.t_check_img, self.v_check_img],axis=0)
+        
+        del self.t_check_img
+        del self.v_check_img
+        
 
         self.total_expand1 = np.load(path+'/total_img{}.npy'.format(expansion_list[0]))
         self.total_expand2 = np.load(path+'/total_img{}.npy'.format(expansion_list[1]))
         self.total_expand3 = np.load(path+'/total_img{}.npy'.format(expansion_list[2]))
 
-        self.expand_img1, self.expand_img2,self.expand_img3, self.origin_img, self.label, self.coord = parsing_index_four(self.total_expand1, self.total_expand2, 
-                                                                                                                          self.total_expand3,self.total_img, 
-                                                                                                                          self.total_label, self.total_coord, index_set)
+        self.expand_img1, self.expand_img2,self.expand_img3, self.origin_img, self.label, self.coord, self.check_img = parsing_index_four_valid(self.total_expand1, 
+                                                                                                                                                self.total_expand2, 
+                                                                                                                                                self.total_expand3,
+                                                                                                                                                self.total_img, 
+                                                                                                                                                self.total_label, 
+                                                                                                                                                self.total_coord, 
+                                                                                                                                                index_set, 
+                                                                                                                                                self.check_img)
         
         self.expand_img1 = self.expand_img1/255.0
         self.expand_img2 = self.expand_img2/255.0
@@ -539,35 +640,49 @@ class SoundFourValidInstance(Dataset):
             self.mean_value = t_mean
             self.std_value = t_std
 
-        self.expand_img1, self.expand_img2, self.expand_img3, self.origin_img, self.label= self.dataset_split(self.expand_img1,self.expand_img2,self.expand_img3,
-                                                                            self.origin_img, self.label, atype=atype)
+        if not trainset:
+            self.expand_img1, self.expand_img2, self.expand_img3, self.origin_img, self.label= self.dataset_split(self.expand_img1,self.expand_img2,
+                                                                                                                  self.expand_img3,self.origin_img, 
+                                                                                                                  self.label, self.check_img, atype=atype)
         
             
     def __len__(self):
         return self.origin_img.shape[0]
 
-    def dataset_split(self,eimg1, eimg2, eimg3, oimg, label, atype):
+    def dataset_split(self,eimg1, eimg2, eimg3, oimg, label, check_img, atype):
         if atype =='total':
             return eimg1,eimg2,eimg3, oimg, label 
         
         elif atype =='center':
-            index = np.load(self.path+'/center_idx.npy')
+            build = np.where(check_img<=90/255.0, check_img, 1.0)
+            road = np.where(check_img>=90/255.0, check_img, 1.0)
+            road_flag = np.where(np.sum(1-road,axis=(1,2))!=0, 1, 0)
+            build_flag = np.where(np.sum(1-build,axis=(1,2))!=0, 1, 0)
 
-            eimg1 = eimg1[index]
-            eimg2 = eimg2[index]
-            eimg3 = eimg3[index]
-            oimg = oimg[index]
-            label = label[index]
+            mask = (road_flag==1) & (build_flag==1)
+            bothin = np.where(mask)[0] # Center idx
+
+            eimg1 = eimg1[bothin]
+            eimg2 = eimg2[bothin]
+            eimg3 = eimg3[bothin]
+            oimg = oimg[bothin]
+            label = label[bothin]
             return eimg1,eimg2,eimg3, oimg, label
             
         elif atype == 'noncenter':
-            index = np.load(self.path+'/noncenter_idx.npy')
+            build = np.where(check_img<=90/255.0, check_img, 1.0)
+            road = np.where(check_img>=90/255.0, check_img, 1.0)
+            road_flag = np.where(np.sum(1-road,axis=(1,2))!=0, 1, 0)
+            build_flag = np.where(np.sum(1-build,axis=(1,2))!=0, 1, 0)
 
-            eimg1 = eimg1[index]
-            eimg2 = eimg2[index]
-            eimg3 = eimg3[index]
-            oimg = oimg[index]
-            label = label[index]
+            mask = (road_flag==0) | (build_flag==0)
+            bothnotin = np.where(mask)[0] # Center idx
+
+            eimg1 = eimg1[bothnotin]
+            eimg2 = eimg2[bothnotin]
+            eimg3 = eimg3[bothnotin]
+            oimg = oimg[bothnotin]
+            label = label[bothnotin]
             return eimg1,eimg2,eimg3, oimg, label
         else:
             raise NotImplementedError()
@@ -622,7 +737,7 @@ class SoundFourValidInstance(Dataset):
     
 class SoundThreeValidInstance(Dataset):
     # Multi Channel Dataset 10m x 10m resolution
-    def __init__(self, path, index_set, expansion_list, t_mean=None, t_std = None, atype='total',transform=None,target_transform=None):
+    def __init__(self, path, index_set, expansion_list, trainset=True, t_mean=None, t_std = None, atype='total',transform=None,target_transform=None):
 
         self.path = path
         self.transform=transform
@@ -647,13 +762,20 @@ class SoundThreeValidInstance(Dataset):
         del self.train_coord
         del self.test_label
         del self.test_coord
+        
+        self.t_check_img = np.load(path+'/train_img1.npy')
+        self.v_check_img = np.load(path+'/test_img1.npy')
+        self.check_img = np.concatenate([self.t_check_img, self.v_check_img],axis=0)
+        
+        del self.t_check_img
+        del self.v_check_img
 
         self.total_expand1 = np.load(path+'/total_img{}.npy'.format(expansion_list[0]))
         self.total_expand2 = np.load(path+'/total_img{}.npy'.format(expansion_list[1]))
 
-        self.expand_img1, self.expand_img2, self.origin_img, self.label, self.coord = parsing_index_multi(self.total_expand1, self.total_expand2, 
-                                                                                                                          self.total_img, self.total_label, 
-                                                                                                                          self.total_coord, index_set)
+        self.expand_img1, self.expand_img2, self.origin_img, self.label, self.coord, self.check_img = parsing_index_multi_valid(self.total_expand1, self.total_expand2,
+                                                                                                                self.total_img, self.total_label, 
+                                                                                                                self.total_coord, index_set, self.check_img)
         
         self.expand_img1 = self.expand_img1/255.0
         self.expand_img2 = self.expand_img2/255.0
@@ -664,29 +786,43 @@ class SoundThreeValidInstance(Dataset):
             self.mean_value = t_mean
             self.std_value = t_std
 
-        self.expand_img1, self.expand_img2, self.origin_img, self.label= self.dataset_split(self.expand_img1,self.expand_img2,
-                                                                            self.origin_img, self.label, atype=atype)
+        if not trainset:
+            self.expand_img1, self.expand_img2, self.origin_img, self.label= self.dataset_split(self.expand_img1,self.expand_img2,
+                                                                                                self.origin_img, self.label, 
+                                                                                                self.check_img, atype=atype)
         
-    def dataset_split(self,eimg1, eimg2, oimg, label, atype):
+    def dataset_split(self,eimg1, eimg2, oimg, label, check_img, atype):
         if atype =='total':
             return eimg1,eimg2, oimg, label 
         
         elif atype =='center':
-            index = np.load(self.path+'/center_idx.npy')
+            build = np.where(check_img<=90/255.0, check_img, 1.0)
+            road = np.where(check_img>=90/255.0, check_img, 1.0)
+            road_flag = np.where(np.sum(1-road,axis=(1,2))!=0, 1, 0)
+            build_flag = np.where(np.sum(1-build,axis=(1,2))!=0, 1, 0)
 
-            eimg1 = eimg1[index]
-            eimg2 = eimg2[index]
-            oimg = oimg[index]
-            label = label[index]
+            mask = (road_flag==1) & (build_flag==1)
+            bothin = np.where(mask)[0] # Center idx
+
+            eimg1 = eimg1[bothin]
+            eimg2 = eimg2[bothin]
+            oimg = oimg[bothin]
+            label = label[bothin]
             return eimg1,eimg2, oimg, label
             
         elif atype == 'noncenter':
-            index = np.load(self.path+'/noncenter_idx.npy')
+            build = np.where(check_img<=90/255.0, check_img, 1.0)
+            road = np.where(check_img>=90/255.0, check_img, 1.0)
+            road_flag = np.where(np.sum(1-road,axis=(1,2))!=0, 1, 0)
+            build_flag = np.where(np.sum(1-build,axis=(1,2))!=0, 1, 0)
 
-            eimg1 = eimg1[index]
-            eimg2 = eimg2[index]
-            oimg = oimg[index]
-            label = label[index]
+            mask = (road_flag==0) | (build_flag==0)
+            bothnotin = np.where(mask)[0] # Center idx
+
+            eimg1 = eimg1[bothnotin]
+            eimg2 = eimg2[bothnotin]
+            oimg = oimg[bothnotin]
+            label = label[bothnotin]
             return eimg1,eimg2, oimg, label
         else:
             raise NotImplementedError()
@@ -738,11 +874,11 @@ class SoundThreeValidInstance(Dataset):
 
 class SoundSingleValidInstance(Dataset):
     # Single Channel Dataset 10m x 10m resolution
-    def __init__(self, path, index_set, t_mean=None, t_std = None, atype='total',transform=None,target_transform=None):
+    def __init__(self, path, index_set, trainset=True, t_mean=None, t_std = None, atype='total',transform=None,target_transform=None):
 
         self.transform=transform
         self.target_transform=target_transform
-
+        self.path = path
         self.train_img10=np.load(path+'/train_img10.npy')
         self.train_label=np.load(path+'/train_label.npy')
         self.train_coord=np.load(path+'/train_coord.npy')    
@@ -763,11 +899,16 @@ class SoundSingleValidInstance(Dataset):
         del self.test_label
         del self.test_coord
 
-        self.origin_img, self.label, self.coord = parsing_index(self.total_img10, 
-                                                                    self.total_label, 
-                                                                    self.total_coord, 
-                                                                    index_set 
-                                                                    )
+        self.t_check_img = np.load(path+'/train_img1.npy')
+        self.v_check_img = np.load(path+'/test_img1.npy')
+        self.check_img = np.concatenate([self.t_check_img, self.v_check_img],axis=0)
+        
+        del self.t_check_img
+        del self.v_check_img
+
+        self.origin_img, self.label, self.coord, self.check_img = parsing_index_valid(self.total_img10, self.total_label, 
+                                                                                      self.total_coord,index_set,
+                                                                                      self.check_img)
         
         
         if (t_mean is None) & (t_std is None):
@@ -775,25 +916,37 @@ class SoundSingleValidInstance(Dataset):
         else:
             self.mean_value = t_mean
             self.std_value = t_std
-            
-        self.origin_img, self.label= self.dataset_split(self.origin_img, self.label, atype=atype)
+        if not trainset:        
+            self.origin_img, self.label= self.dataset_split(self.origin_img, self.label, self.check_img, atype=atype)
         
-    def dataset_split(self,oimg, label, atype):
+    def dataset_split(self,oimg, label, check_img, atype):
         if atype =='total':
             return oimg, label 
         
         elif atype =='center':
-            index = np.load(self.path+'/center_idx.npy')
+            build = np.where(check_img<=90/255.0, check_img, 1.0)
+            road = np.where(check_img>=90/255.0, check_img, 1.0)
+            road_flag = np.where(np.sum(1-road,axis=(1,2))!=0, 1, 0)
+            build_flag = np.where(np.sum(1-build,axis=(1,2))!=0, 1, 0)
 
-            oimg = oimg[index]
-            label = label[index]
+            mask = (road_flag==1) & (build_flag==1)
+            bothin = np.where(mask)[0] # Center idx
+
+            oimg = oimg[bothin]
+            label = label[bothin]
             return oimg, label
             
         elif atype == 'noncenter':
-            index = np.load(self.path+'/noncenter_idx.npy')
+            build = np.where(check_img<=90/255.0, check_img, 1.0)
+            road = np.where(check_img>=90/255.0, check_img, 1.0)
+            road_flag = np.where(np.sum(1-road,axis=(1,2))!=0, 1, 0)
+            build_flag = np.where(np.sum(1-build,axis=(1,2))!=0, 1, 0)
 
-            oimg = oimg[index]
-            label = label[index]
+            mask = (road_flag==0) | (build_flag==0)
+            bothnotin = np.where(mask)[0] # Center idx
+
+            oimg = oimg[bothnotin]
+            label = label[bothnotin]
             return oimg, label
         else:
             raise NotImplementedError()
@@ -831,11 +984,11 @@ class SoundSingleValidInstance(Dataset):
 
 class SoundTwoValidInstance(Dataset):
     # Single + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
-    def __init__(self, path, index_set, expansion, t_mean=None, t_std = None,atype='total',transform=None,target_transform=None):
+    def __init__(self, path, index_set, expansion,trainset=True, t_mean=None, t_std = None,atype='total',transform=None,target_transform=None):
 
         self.transform=transform
         self.target_transform=target_transform
-        
+        self.path = path
         self.train_img10=np.load(path+'/train_img10.npy')
         self.train_label=np.load(path+'/train_label.npy')
         self.train_coord=np.load(path+'/train_coord.npy')    
@@ -857,11 +1010,16 @@ class SoundTwoValidInstance(Dataset):
         del self.test_label
         del self.test_coord
 
-        self.expansion_img, self.origin_img, self.label, self.coord = parsing_index(self.total_img10, 
-                                                                                    self.total_label, 
-                                                                                    self.total_coord, 
-                                                                                    index_set, 
-                                                                                    self.total_expand)
+        self.t_check_img = np.load(path+'/train_img1.npy')
+        self.v_check_img = np.load(path+'/test_img1.npy')
+        self.check_img = np.concatenate([self.t_check_img, self.v_check_img],axis=0)
+        
+        del self.t_check_img
+        del self.v_check_img
+
+        self.expansion_img, self.origin_img, self.label, self.coord, self.check_img = parsing_index_valid(self.total_img10, self.total_label, 
+                                                                                                          self.total_coord, index_set,
+                                                                                                          self.check_img, self.total_expand)
         self.expansion_img = self.expansion_img/255.0
         
         if (t_mean is None) & (t_std is None):
@@ -869,31 +1027,43 @@ class SoundTwoValidInstance(Dataset):
         else:
             self.mean_value = t_mean
             self.std_value = t_std
-
-        self.expansion_img, self.origin_img, self.label= self.dataset_split(self.expansion_img, self.origin_img, self.label, atype=atype)
+        if not trainset:
+            self.expansion_img, self.origin_img, self.label= self.dataset_split(self.expansion_img, self.origin_img, self.label,self.check_img, atype=atype)
         
             
     def __len__(self):
         return self.origin_img.shape[0]
 
-    def dataset_split(self,eimg, oimg, label, atype):
+    def dataset_split(self,eimg, oimg, label,check_img, atype):
         if atype =='total':
             return eimg, oimg, label 
         
         elif atype =='center':
-            index = np.load(self.path+'/center_idx.npy')
+            build = np.where(check_img<=90/255.0, check_img, 1.0)
+            road = np.where(check_img>=90/255.0, check_img, 1.0)
+            road_flag = np.where(np.sum(1-road,axis=(1,2))!=0, 1, 0)
+            build_flag = np.where(np.sum(1-build,axis=(1,2))!=0, 1, 0)
 
-            eimg = eimg[index]
-            oimg = oimg[index]
-            label = label[index]
+            mask = (road_flag==1) & (build_flag==1)
+            bothin = np.where(mask)[0] # Center idx
+
+            eimg = eimg[bothin]
+            oimg = oimg[bothin]
+            label = label[bothin]
             return eimg, oimg, label
             
         elif atype == 'noncenter':
-            index = np.load(self.path+'/noncenter_idx.npy')
+            build = np.where(check_img<=90/255.0, check_img, 1.0)
+            road = np.where(check_img>=90/255.0, check_img, 1.0)
+            road_flag = np.where(np.sum(1-road,axis=(1,2))!=0, 1, 0)
+            build_flag = np.where(np.sum(1-build,axis=(1,2))!=0, 1, 0)
 
-            eimg = eimg[index]
-            oimg = oimg[index]
-            label = label[index]
+            mask = (road_flag==0) | (build_flag==0)
+            bothnotin = np.where(mask)[0] # Center idx
+
+            eimg = eimg[bothnotin]
+            oimg = oimg[bothnotin]
+            label = label[bothnotin]
             return eimg, oimg, label
         else:
             raise NotImplementedError()
@@ -1002,7 +1172,7 @@ def get_two_dataloaders(path,resolution,batch_size=128, num_workers=4, seed=0):
                               shuffle=True,
                               num_workers=num_workers)
 
-    test_set = SoundTwoChannelInstance(path,valid_idx, t_mean=t_mean, t_std = t_std)
+    test_set = SoundTwoChannelInstance(path,valid_idx, resolution, t_mean=t_mean, t_std = t_std)
 
     test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
@@ -1111,7 +1281,7 @@ def get_single_valid_dataloaders(path,batch_size=128, num_workers=4, seed=0,atyp
                               shuffle=True,
                               num_workers=num_workers)
 
-    test_set = SoundSingleValidInstance(path, valid_idx, t_mean=t_mean, t_std = t_std, atype=atype)
+    test_set = SoundSingleValidInstance(path, valid_idx, trainset=False,t_mean=t_mean, t_std = t_std, atype=atype)
 
     test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
@@ -1146,7 +1316,7 @@ def get_two_valid_dataloaders(path, resolution, batch_size=128, num_workers=4, s
                               shuffle=True,
                               num_workers=num_workers)
 
-    test_set = SoundTwoValidInstance(path,valid_idx, resolution, t_mean=t_mean, t_std = t_std, atype=atype)
+    test_set = SoundTwoValidInstance(path,valid_idx, resolution, trainset=False,t_mean=t_mean, t_std = t_std, atype=atype)
 
     test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
@@ -1179,7 +1349,7 @@ def get_four_valid_dataloaders(path,resolution_list,batch_size=128, num_workers=
                               shuffle=True,
                               num_workers=num_workers)
 
-    test_set = SoundFourValidInstance(path,valid_idx, resolution_list, t_mean=t_mean, t_std = t_std, atype=atype)
+    test_set = SoundFourValidInstance(path,valid_idx, resolution_list, trainset=False, t_mean=t_mean, t_std = t_std, atype=atype)
 
     test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 
@@ -1215,7 +1385,7 @@ def get_three_valid_dataloaders(path,resolution_list, batch_size=128, num_worker
                               shuffle=True,
                               num_workers=num_workers)
 
-    test_set = SoundThreeValidInstance(path, valid_idx,resolution_list, t_mean = t_mean, t_std = t_std, atype=atype)
+    test_set = SoundThreeValidInstance(path, valid_idx,resolution_list, trainset=False, t_mean = t_mean, t_std = t_std, atype=atype)
 
     test_loader = DataLoader(test_set,batch_size=batch_size,shuffle=False,num_workers=num_workers)
 

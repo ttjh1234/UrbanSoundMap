@@ -96,7 +96,7 @@ class SoundDetachedInstance(Dataset):
         self.transform=transform
         self.target_transform=target_transform
         
-        self.file_object = h5py.File(path+'/total_data_{}.h5py'.format(seed), 'r')
+        self.file_object = h5py.File(path+'/total_data/total_data_{}.h5py'.format(seed), 'r')
         if train:
             self.origin_img = self.file_object['train_img10']
             self.expansion_img = self.file_object['train_img1']
@@ -131,7 +131,262 @@ class SoundDetachedInstance(Dataset):
         
         return img, target, index
 
+
+class SoundSingleTotal(Dataset):
+    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
+    def __init__(self, path, seed, transform=None,target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+        
+        self.file_object = h5py.File(path+'/total_data/total_data_{}.h5py'.format(seed), 'r')
+
+        self.t_origin_img = self.file_object['train_img10']
+        self.t_label = self.file_object['train_label']
+        self.t_coord = self.file_object['train_coord']
+
+        self.v_origin_img = self.file_object['test_img10']
+        self.v_label = self.file_object['test_label']
+        self.v_coord = self.file_object['test_coord']
+        
+        self.origin_img = np.concatenate([self.t_origin_img, self.v_origin_img],axis=0)
+        del self.t_origin_img
+        del self.v_origin_img
+        
+        
+        self.label = np.concatenate([self.t_label, self.v_label],axis=0)
+        self.coord = np.concatenate([self.t_coord, self.v_coord],axis=0)
+        del self.t_label
+        del self.v_label
+        del self.t_coord
+        del self.v_coord
+        
+    def __len__(self):
+        return len(self.origin_img)
     
+
+    def __getitem__(self, index):
+        one_img = self.origin_img[index].reshape(1,100,100)/255.0
+                
+        origin_img=torch.tensor(one_img,dtype=torch.float)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+        coord=torch.tensor(self.coord[index],dtype=torch.long)
+
+        img = origin_img
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        
+        return img, target, coord, index
+
+class SoundTotal(Dataset):
+    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
+    def __init__(self, path, seed, transform=None,target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+        
+        self.file_object = h5py.File(path+'/total_data/total_data_{}.h5py'.format(seed), 'r')
+
+        self.t_origin_img = self.file_object['train_img10']
+        self.t_expansion_img = self.file_object['train_img1']
+        self.t_label = self.file_object['train_label']
+        self.t_coord = self.file_object['train_coord']
+
+        self.v_origin_img = self.file_object['test_img10']
+        self.v_expansion_img = self.file_object['test_img1']
+        self.v_label = self.file_object['test_label']
+        self.v_coord = self.file_object['test_coord']
+        
+        self.origin_img = np.concatenate([self.t_origin_img, self.v_origin_img],axis=0)
+        del self.t_origin_img
+        del self.v_origin_img
+        
+        self.expansion_img = np.concatenate([self.t_expansion_img, self.v_expansion_img],axis=0)
+        del self.t_expansion_img
+        del self.v_expansion_img
+        
+        self.label = np.concatenate([self.t_label, self.v_label],axis=0)
+        self.coord = np.concatenate([self.t_coord, self.v_coord],axis=0)
+        del self.t_label
+        del self.v_label
+        del self.t_coord
+        del self.v_coord
+        
+    def __len__(self):
+        return len(self.origin_img)
+
+    def __getitem__(self, index):
+        one_img = self.origin_img[index].reshape(1,100,100)/255.0
+        expansion_img = self.expansion_img[index].reshape(1,100,100)/255.0
+                
+        origin_img=torch.tensor(one_img,dtype=torch.float)
+        expansion_img=torch.tensor(expansion_img,dtype=torch.float)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+        coord=torch.tensor(self.coord[index],dtype=torch.long)
+
+        img = torch.cat([expansion_img, origin_img],dim=0)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        
+        return img, target, coord, index
+
+
+class SoundMLTotal(Dataset):
+    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
+    def __init__(self, path, mean_v, std_v):
+
+        self.file_object = h5py.File(path+'/newdata/urbanform1000pool2_total.h5py', 'r')
+        self.data = self.file_object['data']
+        #self.data = np.array(self.file_object['data'])
+        self.mean_value = mean_v
+        self.std_value = std_v
+        
+    def __len__(self):
+        return self.data.shape[0]
+    
+    def normalizing(self, x):
+        return (x - self.mean_value)/self.std_value
+
+    def __getitem__(self, index):
+        data = self.data[index].astype(float)
+        data = self.normalizing(data)
+        
+        return data
+
+class SoundSingleMLTotal(Dataset):
+    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
+    def __init__(self, path, mean_v, std_v):
+ 
+        self.file_object = h5py.File(path+'/total_data/total_data_0.h5py', 'r')
+
+        self.t_origin_img = self.file_object['train_img10']
+        self.v_origin_img = self.file_object['test_img10']
+
+        
+        self.origin_img = np.concatenate([self.t_origin_img, self.v_origin_img],axis=0)
+        del self.t_origin_img
+        del self.v_origin_img
+        
+        self.mean_value = mean_v
+        self.std_value = std_v
+        
+    def __len__(self):
+        return len(self.origin_img)
+    
+    def normalizing(self, x):
+        return (x - self.mean_value)/self.std_value
+
+    def __getitem__(self, index):
+        # 70000
+        data= self.origin_img[index].reshape(-1)/255.0
+        data = self.normalizing(data)
+        
+        return data
+
+class SoundTwoMLTotal(Dataset):
+    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
+    def __init__(self, path, mean_v, std_v):
+
+        self.file_object = h5py.File(path+'/total_data/total_data_0.h5py', 'r')
+
+        self.t_origin_img = self.file_object['train_img10']
+        self.t_expansion_img = self.file_object['train_img1']
+        
+        self.v_origin_img = self.file_object['test_img10']
+        self.v_expansion_img = self.file_object['test_img1']
+        
+        
+        self.origin_img = np.concatenate([self.t_origin_img, self.v_origin_img],axis=0)
+        del self.t_origin_img
+        del self.v_origin_img
+        
+        self.expansion_img = np.concatenate([self.t_expansion_img, self.v_expansion_img],axis=0)
+        del self.t_expansion_img
+        del self.v_expansion_img
+        
+        self.mean_value = mean_v
+        self.std_value = std_v
+        
+    def __len__(self):
+        return len(self.origin_img)
+
+    def normalizing(self, x):
+        return (x - self.mean_value)/self.std_value
+
+    def __getitem__(self, index):
+        origin_data = self.origin_img[index].reshape(-1)/255.0
+        expansion_data = self.expansion_img[index].reshape(-1)/255.0
+                        
+        data = np.concatenate([expansion_data, origin_data],axis=0)
+        data = self.normalizing(data)
+        
+        return data
+
+
+def get_ml_total_dataloaders(path,batch_size=128, num_workers=4, seed=0):
+    mean_v = np.load(path+'/newdata/ml_mean.npy')
+    std_v = np.load(path+'/newdata/ml_std.npy')
+
+    test_set = SoundMLTotal(path, mean_v, std_v)
+    num_data = len(test_set)
+    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+    return test_loader, num_data
+
+def get_ml_sv_total_dataloaders(path,batch_size=128, num_workers=4, seed=0):
+    mean_v = np.load(path+'/newdata/ml_single_mean.npy')
+    std_v = np.load(path+'/newdata/ml_single_std.npy')
+
+    test_set = SoundSingleMLTotal(path, mean_v, std_v)
+    num_data = len(test_set)
+    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+    return test_loader, num_data
+
+def get_ml_svp_total_dataloaders(path,batch_size=128, num_workers=4, seed=0):
+    mean_v = np.load(path+'/newdata/ml_two_mean.npy')
+    std_v = np.load(path+'/newdata/ml_two_std.npy')
+
+    test_set = SoundTwoMLTotal(path, mean_v, std_v)
+    num_data = len(test_set)
+    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+    return test_loader, num_data
+
+
+def get_single_total_dataloaders(path,batch_size=128, num_workers=4, seed=0):
+    mean_v = np.load(path+'/sound_map/mean_vec.npy')
+    std_v = np.load(path+'/sound_map/std_vec.npy')
+    test_transform = transforms.Compose([
+        transforms.Normalize(mean_v[[-1]], std_v[[-1]]),
+    ])
+
+    test_set = SoundSingleTotal(path,seed=seed, transform = test_transform)
+    num_data = len(test_set)
+    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+    return test_loader, num_data
+
+def get_total_dataloaders(path,batch_size=128, num_workers=4, seed=0):
+    mean_v = np.load(path+'/sound_map/mean_vec.npy')
+    std_v = np.load(path+'/sound_map/std_vec.npy')
+    test_transform = transforms.Compose([
+        transforms.Normalize(mean_v, std_v),
+    ])
+
+    test_set = SoundTotal(path,seed=seed, transform = test_transform)
+    num_data = len(test_set)
+    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=False,num_workers=num_workers)
+
+    return test_loader, num_data
 
 def get_detached_origin_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0):
     
