@@ -9,7 +9,6 @@ Case3 : Augmentation Random Horizontal Flip & Random Vertical Flip
 
 import argparse
 import time
-import random
 import numpy as np
 import torch
 import torch.optim as optim
@@ -21,9 +20,8 @@ import wandb
 
 from models import model_dict
 from utils.loop import train, evaluate
-from utils.util import epoch_time, adjust_learning_rate
-#from dataset.sound import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders
-from dataset.sound_exp import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders,get_aug_rotate_sound_dataloaders
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed
+from dataset.sound import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders,get_aug_rotate_sound_dataloaders
 
 def parse_option():
 
@@ -80,16 +78,6 @@ def parse_option():
         opt.device='cpu'
 
     return opt
-
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 
 def main():
 

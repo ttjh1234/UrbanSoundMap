@@ -11,9 +11,8 @@ import wandb
 
 from two_models import model_dict
 from utils.loop import train, evaluate
-from utils.util import epoch_time, adjust_learning_rate
-# from dataset.sound import get_detached_origin_sound_dataloaders
-from dataset.sound_exp import get_base_expand_dataloaders
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed
+from dataset.sound import get_two_sound_dataloaders
 
 def parse_option():
 
@@ -58,15 +57,6 @@ def parse_option():
 
     return opt
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 
 def main():
 
@@ -92,7 +82,10 @@ def main():
 
     # dataloader
     if opt.dataset == 'sound':
-        train_loader, val_loader, n_data= get_base_expand_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers, seed=opt.trial)
+        train_loader, val_loader, n_data= get_two_sound_dataloaders(path='./assets/newdata/',
+                                                                      batch_size=opt.batch_size, 
+                                                                      num_workers= opt.num_workers, 
+                                                                      seed=opt.trial)
         n_cls = 1
     else:
         raise NotImplementedError(opt.dataset)
@@ -148,7 +141,10 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/model/two-{}-{}-{}-{}.pt'.format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
+            torch.save(model.state_dict(), './assets/model/two-{}-{}-{}-{}.pt'.format(opt.model,
+                                                                                      opt.optimizer,
+                                                                                      int(1000*opt.learning_rate),
+                                                                                      opt.trial))
 
         if math.isnan(train_loss):
             break

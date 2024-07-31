@@ -1117,13 +1117,8 @@ def get_single_dataloaders(path,batch_size=128, num_workers=4, seed=0):
     train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        #transforms.Normalize((0.90865), (0.21802)),
     ])
     
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.90865), (0.21802)),
-    # ])
-
 
     train_set = SoundInstance(path, train_idx, transform = train_transform)
     n_data = len(train_set)
@@ -1153,14 +1148,8 @@ def get_two_dataloaders(path,resolution,batch_size=128, num_workers=4, seed=0):
     train_transform = transforms.Compose([
         SoundRandomHorizontalFlip(),
         SoundRandomVerticalFlip(),
-        # transforms.Normalize((0.92967, 0.91521, 0.99345 ,0.90865), (0.13998, 0.21451, 0.04454 ,0.21802)),
     ])
         
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.92967, 0.91521, 0.99345 ,0.90865), (0.13998, 0.21451, 0.04454 ,0.21802)),
-    # ])
-
-
     train_set = SoundTwoChannelInstance(path,train_idx, resolution, transform = train_transform)
     n_data = len(train_set)
     
@@ -1189,14 +1178,8 @@ def get_three_sound_dataloaders(path, resolution_list, batch_size=128, num_worke
     train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-    #     transforms.Normalize((0.91521, 0.99345 ,0.90865), (0.21451, 0.04454 ,0.21802)),
     ])
     
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.91521, 0.99345 ,0.90865), (0.21451, 0.04454 ,0.21802)),
-    # ])
-
-
     train_set = SoundThreeChannelInstance(path,train_idx, resolution_list, transform = train_transform)
     n_data = len(train_set)
     
@@ -1224,14 +1207,8 @@ def get_four_sound_dataloaders(path, resolution_list, batch_size=128, num_worker
     train_transform = transforms.Compose([
         SoundRandomHorizontalFlip(),
         SoundRandomVerticalFlip(),
-        # transforms.Normalize((0.92967, 0.91521, 0.99345 ,0.90865), (0.13998, 0.21451, 0.04454 ,0.21802)),
     ])
         
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.92967, 0.91521, 0.99345 ,0.90865), (0.13998, 0.21451, 0.04454 ,0.21802)),
-    # ])
-
-
     train_set = SoundFourChannelInstance(path, train_idx, resolution_list, transform = train_transform)
     n_data = len(train_set)
     
@@ -1262,14 +1239,8 @@ def get_single_valid_dataloaders(path,batch_size=128, num_workers=4, seed=0,atyp
     train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        #transforms.Normalize((0.90865), (0.21802)),
     ])
     
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.90865), (0.21802)),
-    # ])
-
-
     train_set = SoundSingleValidInstance(path, train_idx, transform = train_transform)
     n_data = len(train_set)
     
@@ -1297,14 +1268,8 @@ def get_two_valid_dataloaders(path, resolution, batch_size=128, num_workers=4, s
     train_transform = transforms.Compose([
         SoundRandomHorizontalFlip(),
         SoundRandomVerticalFlip(),
-        # transforms.Normalize((0.92967, 0.91521, 0.99345 ,0.90865), (0.13998, 0.21451, 0.04454 ,0.21802)),
     ])
         
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.92967, 0.91521, 0.99345 ,0.90865), (0.13998, 0.21451, 0.04454 ,0.21802)),
-    # ])
-
-
     train_set = SoundTwoValidInstance(path,train_idx, resolution, transform = train_transform)
     n_data = len(train_set)
     
@@ -1334,9 +1299,7 @@ def get_four_valid_dataloaders(path,resolution_list,batch_size=128, num_workers=
     train_transform = transforms.Compose([
         SoundRandomHorizontalFlip(),
         SoundRandomVerticalFlip(),
-        # transforms.Normalize((0.92967, 0.91521, 0.99345 ,0.90865), (0.13998, 0.21451, 0.04454 ,0.21802)),
     ])
-        
 
     train_set = SoundFourValidInstance(path,train_idx,resolution_list, transform = train_transform)
     n_data = len(train_set)
@@ -1366,14 +1329,8 @@ def get_three_valid_dataloaders(path,resolution_list, batch_size=128, num_worker
     train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-    #     transforms.Normalize((0.91521, 0.99345 ,0.90865), (0.21451, 0.04454 ,0.21802)),
     ])
     
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.91521, 0.99345 ,0.90865), (0.21451, 0.04454 ,0.21802)),
-    # ])
-
-
     train_set = SoundThreeValidInstance(path,train_idx,resolution_list, transform = train_transform)
     n_data = len(train_set)
     

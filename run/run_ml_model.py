@@ -14,11 +14,14 @@ import pandas as pd
 from tqdm import tqdm
 import random
 import argparse
-from utils.util import epoch_time
+from utils.util import epoch_time, set_random_seed
 import time
 import math
 import h5py
 import joblib 
+
+# Region Dict : For Gwangju dataset, We split whole region into non-overlap grid. 
+# For dividing data to train and validation set, define coordination of each grid. 
 
 region_dict= {}
 
@@ -83,14 +86,6 @@ def parsing_index(data,label, coord, index):
 
     return data[data_index], label[data_index]
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
 
 def parse_option():
 
@@ -110,8 +105,6 @@ def main():
     
     tcord= np.load('./assets/newdata/train_coord.npy')
     vcord= np.load('./assets/newdata/test_coord.npy')
-    #remove_ind=np.load('./assets/newdata/mlremoveind.npy')
-
     cord = np.concatenate([tcord, vcord],axis=0)
     
     t_target= np.load('./assets/newdata/train_label.npy')
@@ -123,10 +116,7 @@ def main():
     urban_path = './assets/newdata/urbanform{}{}.h5py'.format(opt.resolution,opt.method)
     file_object = h5py.File(urban_path, 'r')
     rep_var = np.array(file_object['data'])
-    
-    #cord = np.delete(cord, remove_ind, axis=0)
-    #target = np.delete(target, remove_ind, axis=0)
-    
+        
     lr_list = []
     print("-----------------------")
     print("Model : ",opt.model)

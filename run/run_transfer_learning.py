@@ -7,14 +7,13 @@ import torch.optim as optim
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import math
-
 import wandb
 from models import model_dict as sm_dict
 from two_models import model_dict as tm_dict
 from utils.loop import train, evaluate
-from utils.util import epoch_time, adjust_learning_rate
-from dataset.sound_ood import get_ood_two_sound_dataloaders, get_ood_sound_dataloaders
-from dataset.sound_da2 import get_sample_ood_two_sound_dataloaders,  get_sample_ood_sound_dataloaders
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed, load_teacher
+from dataset.sound_domain_adaptation import get_ood_two_sound_dataloaders, get_ood_sound_dataloaders
+from dataset.sound_domain_adaptation import get_sample_ood_two_sound_dataloaders,  get_sample_ood_sound_dataloaders
 
 def parse_option():
 
@@ -61,36 +60,6 @@ def parse_option():
         opt.device='cpu'
 
     return opt
-
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
 
 
 def main():
@@ -214,7 +183,11 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/sound_map/{}_{}_{}_da_{}_{}.pt'.format(opt.dataset,opt.method,opt.model,opt.d_num,opt.trial))
+            torch.save(model.state_dict(), './assets/sound_map/{}_{}_{}_da_{}_{}.pt'.format(opt.dataset,
+                                                                                            opt.method,
+                                                                                            opt.model,
+                                                                                            opt.d_num,
+                                                                                            opt.trial))
         
         if math.isnan(train_loss):
             break

@@ -12,9 +12,10 @@ import wandb
 from models import model_dict as sm_dict
 from two_models import model_dict as tm_dict
 from utils.loop import train, evaluate
-from utils.util import epoch_time, adjust_learning_rate
-from dataset.sound_ood import get_ood_two_sound_dataloaders, get_ood_sound_dataloaders
-from dataset.sound_da2 import get_sample_ood_two_sound_dataloaders,  get_sample_ood_sound_dataloaders
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed, load_teacher
+
+from dataset.sound_domain_adaptation import get_ood_two_sound_dataloaders, get_ood_sound_dataloaders
+from dataset.sound_domain_adaptation import get_sample_ood_two_sound_dataloaders,  get_sample_ood_sound_dataloaders
 
 def parse_option():
 
@@ -40,7 +41,6 @@ def parse_option():
     parser.add_argument('--model', type=str, default='vgg13',
                         choices=['vgg8','vgg11','vgg13','vgg16','vgg19','resnet18','wrn_16_2','wrn_40_2'])
     parser.add_argument('--dataset', type=str, default='DJ', choices=['DJ','Seoul'], help='dataset')
-    parser.add_argument('--n_layer', type=str, default='last',choices=['last','full'], help = 'Select Fine Tuning Layer')
     parser.add_argument('--d_num', type=int, default=10, help = 'The number of Training Number')
     # Experiment
     parser.add_argument('--trial', type=int, default=0, help='the experiment id')
@@ -62,36 +62,6 @@ def parse_option():
 
     return opt
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
-
 
 def main():
 
@@ -100,7 +70,13 @@ def main():
     if opt.run_flag==1:
         wandb.init(
             project="sound_prediction_soundmap".format(opt.dataset),
-            name="{}_DA_{}_{}-{}-{}-{}-{}-Baseline".format(opt.dataset,opt.d_num,opt.method,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
+            name="{}_DA_{}_{}-{}-{}-{}-{}-Baseline".format(opt.dataset,
+                                                           opt.d_num,
+                                                           opt.method,
+                                                           opt.model,
+                                                           opt.optimizer,
+                                                           int(1000*opt.learning_rate),
+                                                           opt.trial),
             config={
                 "optimizer" : opt.optimizer,
                 "learning_rate" : opt.learning_rate,
@@ -124,7 +100,7 @@ def main():
                                                             batch_size=512, num_workers=opt.num_workers)
         n_cls = 1
         mdict = tm_dict
-        file_path = './assets/sound_map/'+'two-{}-ADAM-1-0.pt'.format(opt.model)
+
     elif opt.method =='single':
         train_loader, mean_v, std_v = get_sample_ood_sound_dataloaders(path='./assets/newdata/', region = opt.dataset,sample_size=opt.d_num, 
                                                                        batch_size=opt.batch_size, num_workers=opt.num_workers)
@@ -133,13 +109,11 @@ def main():
                                                  batch_size=512, num_workers=opt.num_workers)
         n_cls = 1
         mdict = sm_dict
-        file_path = './assets/sound_map/'+'single-{}-ADAM-1-0.pt'.format(opt.model)
 
     else:
         raise NotImplementedError(opt.dataset)
 
     # model
-   # model = load_teacher(opt.model,mdict,file_path,n_cls)
     model = mdict[opt.model](num_classes=n_cls)
     if opt.multigpu:
         model =nn.DataParallel(model,device_ids=[0,1])
@@ -149,46 +123,14 @@ def main():
     best_loss = 1e+7
 
     if opt.optimizer == "ADAM":
-        if opt.n_layer == 'last':
-            # All parameter Freeze
-            for param in model.parameters():
-                param.requires_grad = False
-            
-            for param in model.classifier.parameters():
-                param.requires_grad = True
-            
-            optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
-                        lr=opt.learning_rate,
-                        weight_decay=opt.weight_decay)
-            
-        elif opt.n_layer == 'full':
-            optimizer = optim.Adam(model.parameters(),
-                        lr=opt.learning_rate,
-                        weight_decay=opt.weight_decay)
-        else:
-            raise NotImplementedError()
-
+        optimizer = optim.Adam(model.parameters(),
+                    lr=opt.learning_rate,
+                    weight_decay=opt.weight_decay)
 
     elif opt.optimizer == "ADAMW":
-        if opt.n_layer == 'last':
-            for param in model.parameters():
-                param.requires_grad = False
-            
-            for param in model.classifier.parameters():
-                param.requires_grad = True
-                
-            optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                        lr=opt.learning_rate,
-                        weight_decay=opt.weight_decay)
-
-        elif opt.n_layer == 'full':
-            optimizer = optim.AdamW(model.parameters(),
-                        lr=opt.learning_rate,
-                        weight_decay=opt.weight_decay)
-
-        else:
-            raise NotImplementedError()
-        
+        optimizer = optim.AdamW(model.parameters(),
+                    lr=opt.learning_rate,
+                    weight_decay=opt.weight_decay)       
     else:
         raise NotImplementedError(opt.optimizer)
 
@@ -217,7 +159,12 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/sound_map/no_da_{}_{}_{}_da_{}_{}_{}.pt'.format(opt.dataset,opt.method,opt.model,opt.d_num,opt.trial,opt.learning_rate))
+            torch.save(model.state_dict(), './assets/sound_map/no_da_{}_{}_{}_da_{}_{}_{}.pt'.format(opt.dataset,
+                                                                                                     opt.method,
+                                                                                                     opt.model,
+                                                                                                     opt.d_num,
+                                                                                                     opt.trial,
+                                                                                                     opt.learning_rate))
         
         if math.isnan(train_loss):
             break

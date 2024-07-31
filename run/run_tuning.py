@@ -13,9 +13,8 @@ import wandb
 from two_models import model_dict as tm_dict
 from four_models import model_dict as fm_dict
 from utils.loop import train, evaluate
-from utils.util import epoch_time, adjust_learning_rate
-# from dataset.sound import get_detached_origin_sound_dataloaders
-from dataset.sound_exp import get_base_expand_dataloaders,get_detached_sound_dataloaders
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed
+from dataset.sound import get_two_sound_dataloaders
 
 def parse_option():
 
@@ -37,7 +36,7 @@ def parse_option():
     parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 
     # dataset
-    parser.add_argument('--method', type=str, default = 'two', choices = ['two','four'])
+    parser.add_argument('--method', type=str, default = 'two', choices = ['two'])
     parser.add_argument('--model', type=str, default='vgg13',
                         choices=['vgg8','vgg11','vgg13','vgg16','vgg19','resnet18','wrn_16_2','wrn_40_2'])
 
@@ -61,15 +60,6 @@ def parse_option():
 
     return opt
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 
 def main():
 
@@ -78,7 +68,14 @@ def main():
     if opt.run_flag==1:
         wandb.init(
             project="sound_prediction_tuning",
-            name="{}-{}-{}-{}-{}-{}-{}-{}-Baseline".format(opt.method, opt.schedule,opt.epochs,opt.batch_size,opt.model, opt.optimizer,int(1000*opt.learning_rate),opt.trial),
+            name="{}-{}-{}-{}-{}-{}-{}-{}-Baseline".format(opt.method, 
+                                                           opt.schedule,
+                                                           opt.epochs,
+                                                           opt.batch_size,
+                                                           opt.model, 
+                                                           opt.optimizer,
+                                                           int(1000*opt.learning_rate),
+                                                           opt.trial),
             config={
                 "method" : opt.method,
                 "epoch" : opt.epochs,
@@ -100,14 +97,12 @@ def main():
 
     # dataloader
     if opt.method == 'two':
-        train_loader, val_loader, n_data= get_base_expand_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers, seed=opt.trial)
+        train_loader, val_loader, n_data= get_two_sound_dataloaders(path='./assets/newdata/',
+                                                                      batch_size=opt.batch_size, 
+                                                                      num_workers= opt.num_workers, 
+                                                                      seed=opt.trial)
         n_cls = 1
         model_dict = tm_dict
-    elif opt.method == 'four':
-        train_loader, val_loader, n_data= get_detached_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers, seed=opt.trial)
-        n_cls = 1
-        model_dict = fm_dict
-
     else:
         raise NotImplementedError(opt.method)
 

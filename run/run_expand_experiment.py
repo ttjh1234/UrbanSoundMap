@@ -14,8 +14,8 @@ from multi_models import model_dict as mm_dict
 from four_models import model_dict as fm_dict
 from two_models import model_dict as tm_dict
 from utils.loop import train, evaluate
-from utils.util import epoch_time, adjust_learning_rate
-from dataset.sound_expand import get_single_dataloaders, get_two_dataloaders, get_three_sound_dataloaders,get_four_sound_dataloaders
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed
+from dataset.sound_expand import get_single_dataloaders, get_two_dataloaders, get_three_sound_dataloaders
 
 def parse_option():
 
@@ -63,8 +63,6 @@ def parse_option():
         opt.method = 'two'
     elif len(opt.resolution_list) == 3:
         opt.method = 'multi'
-    elif len(opt.resolution_list) == 4:
-        opt.method = 'four'
     else:
         raise NotImplementedError()
     
@@ -77,15 +75,6 @@ def parse_option():
 
     return opt
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 
 def main():
 
@@ -96,7 +85,12 @@ def main():
     if opt.run_flag==1:
         wandb.init(
             project="sound_prediction_ablation_expand",
-            name="{}-{}-{}-{}-{}-{}".format(opt.method,opt.model,resol_name,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
+            name="{}-{}-{}-{}-{}-{}".format(opt.method,
+                                            opt.model,
+                                            resol_name,
+                                            opt.optimizer,
+                                            int(1000*opt.learning_rate),
+                                            opt.trial),
             config={
                 "optimizer" : opt.optimizer,
                 "learning_rate" : opt.learning_rate,
@@ -113,25 +107,31 @@ def main():
     set_random_seed(opt.trial)
 
     if opt.method == 'single':
-        train_loader, valid_loader, ndata = get_single_dataloaders(path='./assets/newdata/', batch_size=opt.batch_size, num_workers=opt.num_workers, seed = opt.trial)
+        train_loader, valid_loader, ndata = get_single_dataloaders(path='./assets/newdata/', 
+                                                                   batch_size=opt.batch_size, 
+                                                                   num_workers=opt.num_workers, 
+                                                                   seed = opt.trial)
         n_cls = 1
         mdict = sm_dict
 
     elif opt.method == 'two':
-        train_loader, valid_loader, ndata = get_two_dataloaders(path='./assets/newdata/', resolution=opt.resolution_list[0], batch_size=opt.batch_size, num_workers=opt.num_workers, seed = opt.trial)
+        train_loader, valid_loader, ndata = get_two_dataloaders(path='./assets/newdata/', 
+                                                                resolution=opt.resolution_list[0], 
+                                                                batch_size=opt.batch_size, 
+                                                                num_workers=opt.num_workers, 
+                                                                seed = opt.trial)
         n_cls = 1
         mdict = tm_dict
         
     elif opt.method == 'multi':
-        train_loader, valid_loader, ndata = get_three_sound_dataloaders(path='./assets/newdata/', resolution_list=opt.resolution_list[:-1], batch_size=opt.batch_size, num_workers=opt.num_workers, seed = opt.trial)
+        train_loader, valid_loader, ndata = get_three_sound_dataloaders(path='./assets/newdata/', 
+                                                                        resolution_list=opt.resolution_list[:-1], 
+                                                                        batch_size=opt.batch_size, 
+                                                                        num_workers=opt.num_workers, 
+                                                                        seed = opt.trial)
         n_cls = 1
         mdict = mm_dict
-        
-    elif opt.method == 'four':
-        train_loader, valid_loader, ndata = get_four_sound_dataloaders(path='./assets/newdata/', resolution_list=opt.resolution_list[:-1], batch_size=opt.batch_size, num_workers=opt.num_workers, seed = opt.trial)
-        n_cls = 1
-        mdict = fm_dict
-        
+                
     else:
         raise NotImplementedError(opt.method)
 

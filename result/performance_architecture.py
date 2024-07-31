@@ -12,11 +12,12 @@ from models import model_dict as sm_dict
 from multi_models import model_dict as mm_dict
 from four_models import model_dict as fm_dict
 from two_models import model_dict as tm_dict
-from dataset.sound_exp import get_detached_sound_valid_dataloaders, get_detached_origin_sound_valid_dataloaders, get_sound_valid_dataloaders, get_two_sound_valid_dataloaders
+from dataset.sound import get_sound_valid_dataloaders, get_two_sound_valid_dataloaders
 from dataset.sound_r import get_r_valid_sound_dataloaders
 import random
 import argparse
-
+from utils.util import load_teacher, set_random_seed
+from utils.metric import rmse_metric
 
 def parse_option():
 
@@ -50,41 +51,6 @@ def parse_option():
 
     return opt
 
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
-
-
-def rmse_metric(ypred,y):
-    return np.sqrt(np.mean((y-ypred)**2))
-
-
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 def main():
     opt = parse_option()
     model_name_list = ['vgg13','vgg16','resnet18','wrn_40_2']
@@ -93,7 +59,6 @@ def main():
     for mname in model_name_list:
         result_dict[mname] = []
 
-    
     for i in range(10):
         set_random_seed(i)
         if opt.mtype == 'single':
@@ -104,14 +69,6 @@ def main():
             _, val_loader, n_data= get_two_sound_valid_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers=0,seed=i,atype=opt.atype)
             n_cls = 1
             mdict = tm_dict
-        elif opt.mtype == 'multi':
-            _, val_loader, n_data= get_detached_origin_sound_valid_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers=0,seed=i,atype=opt.atype)
-            n_cls = 1
-            mdict = mm_dict
-        elif opt.mtype == 'four':
-            _, val_loader, n_data= get_detached_sound_valid_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers=0,seed=i,atype=opt.atype)
-            n_cls = 1
-            mdict = fm_dict
         elif opt.mtype == 'r':
             val_loader= get_r_valid_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers=0,seed=i,atype=opt.atype)
             n_cls = 1
@@ -126,12 +83,6 @@ def main():
                 model = load_teacher(mname,mdict,model_path,n_cls)
             elif opt.mtype =='two':
                 model_path = './assets/model/'+'{}-{}-ADAM-1-{}.pt'.format('two',mname,i)
-                model = load_teacher(mname,mdict,model_path,n_cls)
-            elif opt.mtype =='multi':
-                model_path = './assets/model/'+'{}-{}-ADAM-1-{}.pt'.format('decoupled',mname,i)
-                model = load_teacher(mname,mdict,model_path,n_cls)
-            elif opt.mtype =='four':
-                model_path = './assets/model/'+'{}-{}-ADAM-1-{}.pt'.format('four',mname,i)
                 model = load_teacher(mname,mdict,model_path,n_cls)
             elif opt.mtype =='r':
                 model_path = './assets/model/'+'r-{}-ADAM-1-{}.pt'.format(mname,i)

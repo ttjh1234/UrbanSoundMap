@@ -13,9 +13,8 @@ from models import model_dict as sm_dict
 from two_models import model_dict as tm_dict
 
 from utils.loop import train_multiple, evaluate_multiple
-from utils.util import epoch_time, adjust_learning_rate
-#from dataset.sound import get_no_aug_sound_dataloaders, get_aug_crop_sound_dataloaders,get_sound_dataloaders
-from dataset.sound_overlap_multiple import get_overlap_multiple_sound_dataloaders,get_overlap_multiple_two_sound_dataloaders
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed
+from dataset.sound_multiple import get_overlap_multiple_sound_dataloaders,get_overlap_multiple_two_sound_dataloaders
 
 def parse_option():
 
@@ -62,15 +61,6 @@ def parse_option():
         opt.device='cpu'
     return opt
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 
 def main():
 
@@ -79,7 +69,12 @@ def main():
     if opt.run_flag==1:
         wandb.init(
             project="sound_overlap_multiple_prediction",
-            name="{}-{}-{}-{}-{}-{}-Baseline".format(opt.mtype,opt.multiple_factor, opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
+            name="{}-{}-{}-{}-{}-{}-Baseline".format(opt.mtype,
+                                                     opt.multiple_factor, 
+                                                     opt.model,
+                                                     opt.optimizer,
+                                                     int(1000*opt.learning_rate),
+                                                     opt.trial),
             config={
                 "Channel" : opt.mtype,
                 "Factor" : opt.multiple_factor,
@@ -97,15 +92,25 @@ def main():
 
     # dataloader
     if opt.mtype == 'single':
-        train_loader, val_loader, n_data= get_overlap_multiple_sound_dataloaders(path='./assets/multiple/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed= opt.trial, multiple_factor = opt.multiple_factor)
+        train_loader, val_loader, n_data= get_overlap_multiple_sound_dataloaders(path='./assets/multiple/',
+                                                                                 batch_size=opt.batch_size, 
+                                                                                 num_workers= opt.num_workers,
+                                                                                 seed= opt.trial, 
+                                                                                 multiple_factor = opt.multiple_factor)
         n_cls = int(opt.multiple_factor **2)   
         # model
         model = sm_dict[opt.model](num_classes=n_cls)
+        
     elif opt.mtype == 'two':
-        train_loader, val_loader, n_data= get_overlap_multiple_two_sound_dataloaders(path='./assets/multiple/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed= opt.trial, multiple_factor = opt.multiple_factor)
+        train_loader, val_loader, n_data= get_overlap_multiple_two_sound_dataloaders(path='./assets/multiple/',
+                                                                                     batch_size=opt.batch_size, 
+                                                                                     num_workers= opt.num_workers,
+                                                                                     seed= opt.trial, 
+                                                                                     multiple_factor = opt.multiple_factor)
         n_cls = int(opt.multiple_factor **2)   
         # model
         model = tm_dict[opt.model](num_classes=n_cls)
+
     else:
         raise NotImplementedError()
     
@@ -143,7 +148,12 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/overlap_multiple_model/{}-{}-{}-{}-{}-{}.pt'.format(opt.mtype, opt.multiple_factor,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
+            torch.save(model.state_dict(), './assets/overlap_multiple_model/{}-{}-{}-{}-{}-{}.pt'.format(opt.mtype, 
+                                                                                                         opt.multiple_factor,
+                                                                                                         opt.model,
+                                                                                                         opt.optimizer,
+                                                                                                         int(1000*opt.learning_rate),
+                                                                                                         opt.trial))
 
 
         if math.isnan(train_loss):

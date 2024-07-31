@@ -39,7 +39,6 @@ def parse_option():
 
     return opt
 
-
 def main():
     start = time.perf_counter()
     opt = parse_option()

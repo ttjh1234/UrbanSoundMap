@@ -16,7 +16,13 @@ import random
 import pandas as pd
 import h5py 
 
-# Sound Augmentation Random Horizontal Flip and Random Vertical Flip
+def srs_group(total_size, sample_size):
+    sample_idx = np.random.choice(range(total_size),size=sample_size, replace=False)
+    sample_idx = np.sort(sample_idx)
+     
+    return sample_idx
+
+# For four channel ,Sound Augmentation Random Horizontal Flip and Random Vertical Flip
 class SoundRandomHorizontalFlip(nn.Module):
     def __init__(self, p=0.5):
         super().__init__()
@@ -79,7 +85,7 @@ class SoundOODInstance(Dataset):
         return img, target, index
 
 class SoundOODTwoInstance(Dataset):
-    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
+    # Single + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
     def __init__(self, path, region, transform=None,target_transform=None):
 
         self.transform=transform
@@ -139,92 +145,82 @@ class SoundOODTwoEvalInstance(Dataset):
         
         return img, target, coord, index
 
-class SoundOODDetachedOriginInstance(Dataset):
-    # Multi Channel Dataset 10m x 10m resolution
-    def __init__(self, path, region, transform=None,target_transform=None):
+
+class SoundSampleOODInstance(Dataset):
+    # Single Channel Dataset 10m x 10m resolution
+    def __init__(self, path, region, sample_size, t_mean=None, t_std = None, transform=None,target_transform=None):
 
         self.transform=transform
         self.target_transform=target_transform
         
         self.file_object = h5py.File(path+'/test_region_{}.h5py'.format(region), 'r')
+
+        sample_idx = srs_group(self.file_object['test_label'].shape[0], sample_size)
+        self.img = self.file_object['test_img10'][sample_idx]
+        self.label = self.file_object['test_label'][sample_idx]
+        self.img = self.img / 255.0
         
+        if (t_mean is None) & (t_std is None):
+            self.mean_value, self.std_value = self.get_mean_var()
+        else:
+            self.mean_value = t_mean
+            self.std_value = t_std
+    
+    def get_mean_var(self):
+        mean_value = np.mean(np.mean(self.img,axis=(1,2)))
+        std_value = np.mean(np.std(self.img,axis=(1,2)))
+
+        return mean_value, std_value
+    
+    def normalizing(self, x):
+        return (x - self.mean_value)/self.std_value
+    
+    
     def __len__(self):
-        return self.file_object['test_label'].shape[0]
+        return self.label.shape[0]
 
     def __getitem__(self, index):
-        one_img = self.file_object['test_img10'][index].reshape(1,100,100)/255.0
-        multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
-
-        multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],1.0)
-        multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],1.0)
+        one_img = self.img[index].reshape(1,100,100)
         
-        img=torch.tensor(multi_channel_img,dtype=torch.float)
-        target=torch.tensor(self.file_object['test_label'][index],dtype=torch.float)
+        img=torch.tensor(one_img,dtype=torch.float)
+        target=torch.tensor(self.label[index],dtype=torch.float)
 
         if self.transform is not None:
             img = self.transform(img)
 
         if self.target_transform is not None:
             target = self.target_transform(target)
+            
+        img = self.normalizing(img)
                 
         return img, target, index
 
-
-class SoundOODDetachedInstance(Dataset):
+class SoundSampleOODTwoInstance(Dataset):
     # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
-    def __init__(self, path, region, transform=None,target_transform=None):
+    def __init__(self, path, region, sample_size, t_mean=None, t_std = None, transform=None,target_transform=None):
 
         self.transform=transform
         self.target_transform=target_transform
         
         self.file_object = h5py.File(path+'/test_region_{}.h5py'.format(region), 'r')
-            
-    def __len__(self):
-        return self.file_object['test_label'].shape[0]
+        sample_idx = srs_group(self.file_object['test_label'].shape[0], sample_size)
 
-    def __getitem__(self, index):
-        one_img = self.file_object['test_img10'][index].reshape(1,100,100)/255.0
-        expansion_img = self.file_object['test_img1'][index].reshape(1,100,100)/255.0
-        multi_channel_img = np.concatenate([np.ones((2,100,100)),one_img],axis=0)
-
-        multi_channel_img[0,:,:] = np.where(multi_channel_img[2]<=90/255.0, multi_channel_img[2],1.0)
-        multi_channel_img[1,:,:] = np.where(multi_channel_img[2]>90/255.0, multi_channel_img[2],1.0)
-        
-        origin_img=torch.tensor(multi_channel_img,dtype=torch.float)
-        expansion_img=torch.tensor(expansion_img,dtype=torch.float)
-        target=torch.tensor(self.file_object['test_label'][index],dtype=torch.float)
-
-        img = torch.cat([expansion_img, origin_img],dim=0)
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-        
-        return img, target, index
-
-
-class SoundTwoDJInstance(Dataset):
-    # Multi + Expansion Channel Dataset 10m x 10m, 1m x 1m resolution
-    def __init__(self, path, t_mean = None, t_std = None,transform=None,target_transform=None):
-
-        self.transform=transform
-        self.target_transform=target_transform
-        
-        self.origin_img = np.load(path+'./dj_total_img10.npy')/255.0
-        self.expansion_img = np.load(path+'./dj_total_img1.npy')/255.0
-        self.label = np.load(path+'./dj_total_label.npy')
-
+        self.origin_img = self.file_object['test_img10'][sample_idx] / 255.0
+        self.expansion_img = self.file_object['test_img1'][sample_idx] / 255.0
+        self.label = self.file_object['test_label'][sample_idx]
 
         if (t_mean is None) & (t_std is None):
             self.mean_value, self.std_value = self.get_mean_var()
         else:
             self.mean_value = t_mean
             self.std_value = t_std
-        
+            
+    def __len__(self):
+        return self.origin_img.shape[0]
+
+
     def get_mean_var(self):
-        # 2 channel         
+        # 3 channel         
         mean_value0 = np.mean(np.mean(self.expansion_img,axis=(1,2)))
         std_value0 = np.mean(np.std(self.expansion_img,axis=(1,2)))
         
@@ -238,10 +234,7 @@ class SoundTwoDJInstance(Dataset):
 
     def normalizing(self, x):
         return (x - self.mean_value)/self.std_value
-        
-            
-    def __len__(self):
-        return self.origin_img.shape[0]
+    
 
     def __getitem__(self, index):
         one_img = self.origin_img[index].reshape(1,100,100)
@@ -258,57 +251,48 @@ class SoundTwoDJInstance(Dataset):
 
         if self.target_transform is not None:
             target = self.target_transform(target)
-        
+            
         img = self.normalizing(img)
         
         return img, target, index
-    
 
-def get_two_dj_sound_dataloaders(path, batch_size=128, num_workers=4):
-    train_transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        #transforms.Normalize((0.90865), (0.21802)),
-    ])
-    
-    train_set = SoundTwoDJInstance(path,transform = train_transform)
-    t_mean = train_set.mean_value
-    t_std = train_set.std_value
-    
-    train_loader = DataLoader(train_set, batch_size=batch_size,shuffle=True,num_workers=num_workers)
 
-    return train_loader, t_mean, t_std
-
-def get_ood_detached_origin_sound_dataloaders(path,region, mean_vec, std_vec, batch_size=128, num_workers=4):
-    
-    """
-    Sound Map multi channel data
-    """
-    
-    test_transform = transforms.Compose([
-        transforms.Normalize(mean_vec, std_vec),
-    ])
-    
-    test_set = SoundOODDetachedOriginInstance(path,region = region, transform = test_transform)
-
-    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=False,num_workers=num_workers)
-
-    return test_loader
-
-def get_ood_detached_sound_dataloaders(path,region, mean_vec, std_vec, batch_size=128, num_workers=4):
+def get_sample_ood_sound_dataloaders(path,region,sample_size, batch_size=128, num_workers=4):
     
     """
     Sound Map multi + expansion data
     """
     test_transform = transforms.Compose([
-        transforms.Normalize(mean_vec, std_vec),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
     ])
     
-    test_set = SoundOODDetachedInstance(path,region = region, transform = test_transform)
+    test_set = SoundSampleOODInstance(path,region = region,sample_size=sample_size, transform = test_transform)
+    mean_vec = test_set.mean_value
+    std_vec = test_set.std_value
 
-    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=False,num_workers=num_workers)
+    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=True,num_workers=num_workers)
 
-    return test_loader
+    return test_loader, mean_vec, std_vec
+
+def get_sample_ood_two_sound_dataloaders(path,region,sample_size, batch_size=128, num_workers=4):
+    
+    """
+    Sound Map multi + expansion data
+    """
+    test_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+    ])
+    
+    test_set = SoundSampleOODTwoInstance(path,region = region,sample_size=sample_size, transform = test_transform)
+    mean_vec = test_set.mean_value
+    std_vec = test_set.std_value
+
+    test_loader = DataLoader(test_set, batch_size=batch_size,shuffle=True,num_workers=num_workers)
+
+    return test_loader, mean_vec, std_vec
+
 
 def get_ood_sound_dataloaders(path,region, mean_vec, std_vec, batch_size=128, num_workers=4):
     

@@ -19,32 +19,11 @@ from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 import h5py
 import joblib
+from utils.util import set_random_seed
 
 
-def parse_option():
-
-    parser = argparse.ArgumentParser('argument for training')
-
-    parser.add_argument('--batch_size', type=int, default=128, help='batch_size')
-    parser.add_argument('--device', type=int, default=0, help='GPU number')
-    parser.add_argument('--num_workers', type=int, default=0, help='Num Worker')
-    
-    # dataset
-    parser.add_argument('--mname', type=str, default='linear',
-                        choices=['linear','DT','LGBM','XGB','CB'])
-    
-    
-    opt = parser.parse_args()
-        
-    if opt.device==0:
-        opt.device='cuda:0'
-    elif opt.device==1:
-        opt.device='cuda:1'
-    else:
-        opt.device='cpu'
-
-    return opt
-
+# Region Dict : For Gwangju dataset, We split whole region into non-overlap grid. 
+# For dividing data to train and validation set, define coordination of each grid. 
 region_dict= {}
 
 region_dict[0] = [[740,1895],[1285,2351]]
@@ -73,6 +52,30 @@ region_dict[18] = [[740,70],[1285,526]]
 region_dict[19] = [[1285,70],[1830,526]]
 region_dict[20] = [[1830,70],[2375,526]]
 region_dict[21] = [[2375,70],[2920,526]]
+
+def parse_option():
+
+    parser = argparse.ArgumentParser('argument for training')
+
+    parser.add_argument('--batch_size', type=int, default=128, help='batch_size')
+    parser.add_argument('--device', type=int, default=0, help='GPU number')
+    parser.add_argument('--num_workers', type=int, default=0, help='Num Worker')
+    
+    # dataset
+    parser.add_argument('--mname', type=str, default='linear',
+                        choices=['linear','DT','LGBM','XGB','CB'])
+    
+    
+    opt = parser.parse_args()
+        
+    if opt.device==0:
+        opt.device='cuda:0'
+    elif opt.device==1:
+        opt.device='cuda:1'
+    else:
+        opt.device='cpu'
+
+    return opt
 
 def ml_choose_region(seed):
     index_np = np.arange(0,22,1)
@@ -107,16 +110,6 @@ def ml_parsing_index(data,label, coord, index):
         data_index = np.concatenate([data_index, np.where(region_mask)[0]],axis=0)
 
     return data[data_index], label[data_index], coord[data_index]
-
-
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
 
 def main():
 

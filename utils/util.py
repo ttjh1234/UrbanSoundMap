@@ -1,40 +1,10 @@
 import numpy as np
-import torch
 import time
-
-def rescale_data(x,mean=None,std=None):
-    
-    '''
-    Input x is (C,H,W) image and normalized vec. 
-    Output is (H,W,C) image and denormalized vec.
-    '''
-    
-    if not mean:
-        mean=np.array((0.9113)).reshape(-1,1,1)
-    
-    if not std:
-        std=np.array((0.2168)).reshape(-1,1,1)
-    
-    x=x*std+mean
-    x=np.transpose(x,[1,2,0])
-    return x
-
-def rescale_multi_data(x,mean=None,std=None):
-    
-    '''
-    Input x is (C,H,W) image and normalized vec. 
-    Output is (H,W,C) image and denormalized vec.
-    '''
-    
-    if not mean:
-        mean=np.array((0.92018, 0.99356, 0.91374)).reshape(-1,1,1)
-    
-    if not std:
-        std=np.array((0.20518, 0.04393, 0.20895)).reshape(-1,1,1)
-    
-    x=x*std+mean
-    x=np.transpose(x,[1,2,0])
-    return x
+import random
+import torch
+import torch.optim as optim
+import torch.nn as nn
+import torch.backends.cudnn as cudnn
 
 def epoch_time(start_time, end_time):
     elapsed_time = end_time - start_time
@@ -81,3 +51,33 @@ def check_inference_time_for_cpu(model):
     print(f"Elapsed time on CPU : {end - start} seconds")
     
 
+def set_random_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
+    
+    
+def load_teacher(model_name, model_dict, model_path, n_cls):
+    print('==> loading teacher model')
+    model = model_dict[model_name](num_classes=n_cls)
+    
+    try:
+        print("Single GPU Model Load")
+        model.load_state_dict(torch.load(model_path))
+        print("Load Single Model")
+    except:
+        print("Mutil GPU Model Load")
+        state_dict=torch.load(model_path)
+        new_state_dict = {}
+        for key in state_dict:
+            new_key = key.replace('module.','')
+            new_state_dict[new_key] = state_dict[key]
+        model.load_state_dict(new_state_dict)
+        print("Load Single GPU Model from Multi GPU Model")
+    
+    print('==> done')
+    return model

@@ -118,6 +118,65 @@ class SoundMapInstance(Dataset):
         return img, target, index
 
 
+class SoundMapDJInstance(Dataset):
+    # Single + Expansion Channel Sample Dataset 10m x 10m, 1m x 1m resolution
+    def __init__(self, path, t_mean = None, t_std = None,transform=None,target_transform=None):
+
+        self.transform=transform
+        self.target_transform=target_transform
+        
+        self.origin_img = np.load(path+'./dj_total_img10.npy')/255.0
+        self.expansion_img = np.load(path+'./dj_total_img1.npy')/255.0
+        self.label = np.load(path+'./dj_total_label.npy')
+
+
+        if (t_mean is None) & (t_std is None):
+            self.mean_value, self.std_value = self.get_mean_var()
+        else:
+            self.mean_value = t_mean
+            self.std_value = t_std
+        
+    def get_mean_var(self):
+        # 2 channel         
+        mean_value0 = np.mean(np.mean(self.expansion_img,axis=(1,2)))
+        std_value0 = np.mean(np.std(self.expansion_img,axis=(1,2)))
+        
+        mean_value1 = np.mean(np.mean(self.origin_img,axis=(1,2)))
+        std_value1 = np.mean(np.std(self.origin_img,axis=(1,2)))
+
+        mean_vec = torch.tensor((mean_value0,mean_value1),dtype=torch.float).unsqueeze(1).unsqueeze(1)
+        std_vec = torch.tensor((std_value0,std_value1),dtype=torch.float).unsqueeze(1).unsqueeze(1)
+
+        return mean_vec, std_vec
+
+    def normalizing(self, x):
+        return (x - self.mean_value)/self.std_value
+        
+            
+    def __len__(self):
+        return self.origin_img.shape[0]
+
+    def __getitem__(self, index):
+        one_img = self.origin_img[index].reshape(1,100,100)
+        expansion_img = self.expansion_img[index].reshape(1,100,100)
+
+        origin_img=torch.tensor(one_img,dtype=torch.float)
+        expansion_img=torch.tensor(expansion_img,dtype=torch.float)
+        target=torch.tensor(self.label[index],dtype=torch.float)
+
+        img = torch.cat([expansion_img, origin_img],dim=0)
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        
+        img = self.normalizing(img)
+        
+        return img, target, index
+    
+
 class SoundMapSingleInstance(Dataset):
     # Single Channel Dataset 10m x 10m resolution
     def __init__(self, path, t_mean=None, t_std = None,transform=None,target_transform=None):
@@ -175,6 +234,21 @@ class SoundMapSingleInstance(Dataset):
         img = self.normalizing(img)
 
         return img, target, index
+
+
+def get_soundmap_dj_dataloaders(path, batch_size=128, num_workers=4):
+    train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+    ])
+    
+    train_set = SoundMapDJInstance(path,transform = train_transform)
+    t_mean = train_set.mean_value
+    t_std = train_set.std_value
+    
+    train_loader = DataLoader(train_set, batch_size=batch_size,shuffle=True,num_workers=num_workers)
+
+    return train_loader, t_mean, t_std
 
 def get_soundmap_dataloaders(path,batch_size=128, num_workers=4):
     

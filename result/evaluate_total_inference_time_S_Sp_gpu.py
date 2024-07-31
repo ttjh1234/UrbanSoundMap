@@ -11,6 +11,7 @@ import math
 from two_models import model_dict as tm_dict
 from models import model_dict as sm_dict
 from dataset.sound_hdf5 import get_total_dataloaders,get_single_total_dataloaders
+from utils.util import load_teacher
 
 def parse_option():
 
@@ -35,27 +36,6 @@ def parse_option():
 
     return opt
 
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
-
 
 def main():
     start = time.perf_counter()
@@ -64,7 +44,6 @@ def main():
     if opt.mtype == 'two':
         test_loader, num_data = get_total_dataloaders(path = './assets/', batch_size= opt.batch_size, num_workers=opt.num_workers, seed=opt.trial)
         
-        #mname = 'vgg13'
         model_path = './assets/model/'+'{}-{}-ADAM-1-{}.pt'.format('two',opt.mname,0)
         model = load_teacher(opt.mname,tm_dict,model_path,1)
         if opt.multigpu:
@@ -73,7 +52,6 @@ def main():
     elif opt.mtype == 'single':
         test_loader, num_data = get_single_total_dataloaders(path = './assets/', batch_size= opt.batch_size, num_workers=opt.num_workers, seed=opt.trial)
         
-        #mname = 'vgg13'
         model_path = './assets/aug_exp_model/'+'{}-{}-ADAM-1-{}.pt'.format('Aug_eff',opt.mname,opt.trial)
         model = load_teacher(opt.mname,sm_dict,model_path,1)
         if opt.multigpu:

@@ -15,12 +15,15 @@ from tqdm import tqdm
 import random
 import argparse
 from utils.metric import *
+from utils.util import set_random_seed
 import time
 import math
 import h5py
 import joblib 
-from dataset.sound_exp import choose_region, parsing_index
+from dataset.sound import choose_region, parsing_index
 
+# Region Dict : For Gwangju dataset, We split whole region into non-overlap grid. 
+# For dividing data to train and validation set, define coordination of each grid.
 region_dict= {}
 
 region_dict[0] = [[740,1895],[1285,2351]]
@@ -50,15 +53,6 @@ region_dict[19] = [[1285,70],[1830,526]]
 region_dict[20] = [[1830,70],[2375,526]]
 region_dict[21] = [[2375,70],[2920,526]]
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 def parse_option():
 
     parser = argparse.ArgumentParser('argument for training')
@@ -74,8 +68,6 @@ def main():
     
     tcord= np.load('./assets/newdata/train_coord.npy')
     vcord= np.load('./assets/newdata/test_coord.npy')
-    #remove_ind=np.load('./assets/newdata/mlremoveind.npy')
-
     cord = np.concatenate([tcord, vcord],axis=0)
     
     t_target= np.load('./assets/newdata/train_label.npy')

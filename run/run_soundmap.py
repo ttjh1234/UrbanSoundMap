@@ -11,9 +11,8 @@ import wandb
 from models import model_dict as sm_dict
 from two_models import model_dict as tm_dict
 from utils.loop import train, evaluate
-from utils.util import epoch_time, adjust_learning_rate
-# from dataset.sound import get_detached_origin_sound_dataloaders
-from dataset.sound_map import get_soundmap_dataloaders, get_single_soundmap_dataloaders
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed
+from dataset.sound_map import get_soundmap_dataloaders, get_single_soundmap_dataloaders,get_soundmap_dj_dataloaders
 
 def parse_option():
 
@@ -37,7 +36,7 @@ def parse_option():
     parser.add_argument('--method', type=str, default='single', choices=['single','two'], help='method')
     parser.add_argument('--model', type=str, default='vgg13',
                         choices=['vgg8','vgg11','vgg13','vgg16','vgg19','resnet18','wrn_16_2','wrn_40_2'])
-    parser.add_argument('--dataset', type=str, default='sound', choices=['sound',], help='dataset')
+    parser.add_argument('--dataset', type=str, default='GJ', choices=['GJ','DJ'], help='dataset')
     parser.add_argument('--alpha', type=float, default=1.0, help = 'Balancing parameter')
     # Experiment
     parser.add_argument('--trial', type=int, default=0, help='the experiment id')
@@ -59,16 +58,6 @@ def parse_option():
 
     return opt
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
-
 def main():
 
     opt = parse_option()
@@ -76,7 +65,7 @@ def main():
     if opt.run_flag==1:
         wandb.init(
             project="sound_prediction_soundmap".format(opt.dataset),
-            name="{}-{}-{}-{}-{}-Baseline".format(opt.method,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
+            name="{}-{}-{}-{}-{}-{}-Baseline".format(opt.dataset,opt.method,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial),
             config={
                 "optimizer" : opt.optimizer,
                 "learning_rate" : opt.learning_rate,
@@ -93,7 +82,7 @@ def main():
     set_random_seed(opt.trial)
 
     # dataloader
-    if opt.dataset == 'sound':
+    if opt.dataset == 'GJ':
         if opt.method == 'two':
             train_loader, mean_vec, std_vec, n_data= get_soundmap_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers)
             np.save('./assets/sound_map/mean_vec',mean_vec.to('cpu').numpy())
@@ -108,6 +97,14 @@ def main():
             mdict = sm_dict
         else:
             raise NotImplementedError(opt.method)
+        
+    elif opt.dataset == 'DJ':
+        # For Daejeon, we only make noise map of two channel models.         
+        train_loader, mean_vec, std_vec= get_soundmap_dj_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers)
+        np.save('./assets/sound_map/mean_vec_dj',mean_vec.to('cpu').numpy())
+        np.save('./assets/sound_map/std_vec_dj',std_vec.to('cpu').numpy())
+        n_cls = 1
+        opt.method = 'two'
     else:
         raise NotImplementedError(opt.dataset)
 
@@ -157,7 +154,7 @@ def main():
         print(f'\tTrain Loss: {train_loss:.4f}')
         print(f'\tTrain RMSE: {train_rmse:.4f}')
          
-        torch.save(model.state_dict(), './assets/sound_map/{}-{}-{}-{}-{}.pt'.format(opt.method,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
+        torch.save(model.state_dict(), './assets/sound_map/{}-{}-{}-{}-{}-{}.pt'.format(opt.dataset,opt.method,opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
 
         if math.isnan(train_loss):
             break

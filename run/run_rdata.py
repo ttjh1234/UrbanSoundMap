@@ -12,7 +12,7 @@ import wandb
 
 from four_models import model_dict
 from utils.loop import train, evaluate
-from utils.util import epoch_time, adjust_learning_rate
+from utils.util import epoch_time, adjust_learning_rate, set_random_seed
 from dataset.sound_r import get_r_sound_dataloaders
 
 def parse_option():
@@ -57,14 +57,6 @@ def parse_option():
 
     return opt
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
 
 
 def main():
@@ -89,7 +81,10 @@ def main():
     set_random_seed(opt.trial)
 
     # dataloader
-    train_loader, val_loader, n_data= get_r_sound_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers= opt.num_workers,seed=opt.trial)
+    train_loader, val_loader, n_data= get_r_sound_dataloaders(path='./assets/newdata/',
+                                                              batch_size=opt.batch_size, 
+                                                              num_workers= opt.num_workers,
+                                                              seed=opt.trial)
     n_cls = 1
 
 
@@ -145,7 +140,10 @@ def main():
          
         if valid_rmse < best_loss:
             best_loss = valid_rmse
-            torch.save(model.state_dict(), './assets/model/r-{}-{}-{}-{}.pt'.format(opt.model,opt.optimizer,int(1000*opt.learning_rate),opt.trial))
+            torch.save(model.state_dict(), './assets/model/r-{}-{}-{}-{}.pt'.format(opt.model,
+                                                                                    opt.optimizer,
+                                                                                    int(1000*opt.learning_rate),
+                                                                                    opt.trial))
 
         if math.isnan(train_loss):
             break

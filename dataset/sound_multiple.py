@@ -143,9 +143,9 @@ class SoundMultipleInstance(Dataset):
 
         self.transform=transform
 
-        self.total_img=np.load(path+'/multiple_img10_{}.npy'.format(multiple_factor))
-        self.total_label=np.load(path+'/multiple_noise_{}.npy'.format(multiple_factor))
-        self.total_coord=np.load(path+'/multiple_coord_{}.npy'.format(multiple_factor))   
+        self.total_img=np.load(path+'/multiple_overlap_img10_{}.npy'.format(multiple_factor))
+        self.total_label=np.load(path+'/multiple_overlap_noise_{}.npy'.format(multiple_factor))
+        self.total_coord=np.load(path+'/multiple_overlap_coord_{}.npy'.format(multiple_factor))   
 
         
         self.origin_img, self.label, self.coord = parsing_index(self.total_img, self.total_label, self.total_coord, index_set)
@@ -176,7 +176,6 @@ class SoundMultipleInstance(Dataset):
         img=torch.tensor(self.origin_img[index],dtype=torch.float).unsqueeze(0)
         target=torch.tensor(self.label[index],dtype=torch.float).unsqueeze(0)
 
-        # 이 부분 다시 짜야함. 
         if self.transform is not None:
             img, target = self.transform((img,target))
 
@@ -192,10 +191,10 @@ class SoundMultipleTwoInstance(Dataset):
 
         self.transform=transform
 
-        self.total_img=np.load(path+'/multiple_img10_{}.npy'.format(multiple_factor))
-        self.total_eimg=np.load(path+'/multiple_img1_{}.npy'.format(multiple_factor))
-        self.total_label=np.load(path+'/multiple_noise_{}.npy'.format(multiple_factor))
-        self.total_coord=np.load(path+'/multiple_coord_{}.npy'.format(multiple_factor))   
+        self.total_img=np.load(path+'/multiple_overlap_img10_{}.npy'.format(multiple_factor))
+        self.total_eimg=np.load(path+'/multiple_overlap_img1_{}.npy'.format(multiple_factor))
+        self.total_label=np.load(path+'/multiple_overlap_noise_{}.npy'.format(multiple_factor))
+        self.total_coord=np.load(path+'/multiple_overlap_coord_{}.npy'.format(multiple_factor))   
 
         
         self.expansion_img, self.origin_img, self.label, self.coord = parsing_index(self.total_img, self.total_label, self.total_coord, index_set, self.total_eimg)
@@ -237,7 +236,6 @@ class SoundMultipleTwoInstance(Dataset):
 
         img = torch.cat([expansion_img, origin_img],dim=0)
 
-        # 이 부분 다시 짜야함. 
         if self.transform is not None:
             img, target = self.transform((img,target))
 
@@ -246,8 +244,7 @@ class SoundMultipleTwoInstance(Dataset):
 
         return img, target, index
     
-# get 함수 짜기.
-def get_multiple_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0, multiple_factor=3):
+def get_overlap_multiple_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0, multiple_factor=3):
     
     """
     Sound Map data efficient aug Experiment for single channel dataset
@@ -256,13 +253,8 @@ def get_multiple_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0, m
     train_transform = transforms.Compose([
         SoundMultiRandomHorizontalFlip(mtype = 'single'),
         SoundMultiRandomVerticalFlip(mtype = 'single')
-        #transforms.Normalize((0.90865), (0.21802)),
     ])
     
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.90865), (0.21802)),
-    # ])
-
     train_set = SoundMultipleInstance(path, train_idx, multiple_factor, transform = train_transform)
     n_data = len(train_set)
     
@@ -283,7 +275,7 @@ def get_multiple_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0, m
 
 
 
-def get_multiple_two_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0, multiple_factor=3):
+def get_overlap_multiple_two_sound_dataloaders(path,batch_size=128, num_workers=4, seed=0, multiple_factor=3):
     
     """
     Sound Map data efficient aug Experiment for single channel dataset
@@ -292,13 +284,8 @@ def get_multiple_two_sound_dataloaders(path,batch_size=128, num_workers=4, seed=
     train_transform = transforms.Compose([
         SoundMultiRandomHorizontalFlip(mtype = 'two'),
         SoundMultiRandomVerticalFlip(mtype = 'two')
-        #transforms.Normalize((0.90865), (0.21802)),
     ])
     
-    # test_transform = transforms.Compose([
-    #     transforms.Normalize((0.90865), (0.21802)),
-    # ])
-
     train_set = SoundMultipleTwoInstance(path, train_idx, multiple_factor, transform = train_transform)
     n_data = len(train_set)
     

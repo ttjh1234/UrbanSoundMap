@@ -9,29 +9,8 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import math
 from two_models import model_dict
+from utils.util import load_teacher
 from dataset.sound_hdf5 import get_total_dataloaders
-
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
-
 
 def main():
     test_loader, num_data = get_total_dataloaders(path = './assets/', batch_size= 128, num_workers=0, seed=0)

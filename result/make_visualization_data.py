@@ -8,8 +8,8 @@ import torch.backends.cudnn as cudnn
 
 from models import model_dict as sm_dict
 from two_models import model_dict as tm_dict
-# from dataset.sound import get_detached_origin_sound_dataloaders
-from dataset.sound_exp import get_mean_std_two,get_mean_std_single,get_sound_two_total_dataloaders,get_sound_total_dataloaders
+from utils.util import set_random_seed, load_teacher
+from dataset.sound import get_mean_std_two,get_mean_std_single,get_sound_two_total_dataloaders,get_sound_total_dataloaders
 
 def parse_option():
 
@@ -37,36 +37,6 @@ def parse_option():
 
     return opt
 
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
-
 def main():
 
     opt = parse_option()
@@ -83,7 +53,6 @@ def main():
 
         model_path = './assets/aug_exp_model/'+'{}-{}-ADAM-1-{}.pt'.format('Aug_eff',opt.model,0)
         model = load_teacher(opt.model,model_dict,model_path,n_cls)
-
         # model
         if opt.multigpu:
             model =nn.DataParallel(model,device_ids=[0,1])

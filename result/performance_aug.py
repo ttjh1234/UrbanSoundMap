@@ -4,9 +4,11 @@ import pandas as pd
 from utils.util import *
 from tqdm import tqdm
 from models import model_dict as sm_dict
-from dataset.sound_exp import get_sound_valid_dataloaders
+from dataset.sound import get_sound_valid_dataloaders
 import random
 import argparse
+from utils.util import set_random_seed, load_teacher
+from utils.metric import rmse_metric
 
 def parse_option():
 
@@ -35,40 +37,6 @@ def parse_option():
 
     return opt
 
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
-
-
-def rmse_metric(ypred,y):
-    return np.sqrt(np.mean((y-ypred)**2))
-
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 def main():
     opt = parse_option()
     model_name_list = ['vgg11','vgg13','vgg16','vgg19','resnet18','wrn_16_2','wrn_40_2','inception_resnetv2_2']
@@ -80,7 +48,6 @@ def main():
     
     for i in range(10):
         set_random_seed(i)
-
         _, val_loader, n_data= get_sound_valid_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers=0,seed=i,atype=opt.atype)
         n_cls = 1
         mdict = sm_dict

@@ -10,10 +10,8 @@ from torch.utils.data import TensorDataset, DataLoader
 import torch.nn as nn
 import torch.nn.functional as F
 from models import model_dict as sm_dict
-from multi_models import model_dict as mm_dict
-from four_models import model_dict as fm_dict
 from two_models import model_dict as tm_dict
-from dataset.sound_exp import get_detached_sound_valid_dataloaders, get_detached_origin_sound_valid_dataloaders, get_sound_valid_dataloaders, get_two_sound_valid_dataloaders
+from dataset.sound import get_sound_valid_dataloaders, get_two_sound_valid_dataloaders
 import random
 import argparse
 
@@ -31,13 +29,7 @@ def parse_option():
     # dataset
     parser.add_argument('--model', type=str, default='vgg13',
                         choices=['resnet18','vgg8','vgg11','vgg13','vgg16','vgg19','wrn_16_2','wrn_40_2',
-                                 'vgg8act','vgg11act','vgg13act','vgg16act','vgg19act',
-                                 'resnet8','resnet14','resnet20','resnet32',
-                                 'vgg8fuse2','vgg11fuse2','vgg13fuse2','vgg16fuse2','vgg19fuse2',
-                                 'myvgg8','myvgg11','myvgg13','myvgg16','myvgg19',
-                                 'mymaskvgg8','mymaskvgg11','mymaskvgg13','mymaskvgg16','mymaskvgg19',
-                                 'groupvgg8','groupvgg11','groupvgg13','groupvgg16','groupvgg19',
-                                 'groupvgg8_2','groupvgg11_2','groupvgg13_2','groupvgg16_2','groupvgg19_2',])
+                                 'resnet8','resnet14','resnet20','resnet32',])
     parser.add_argument('--dataset', type=str, default='sound', choices=['sound',], help='dataset')
 
     #parser.add_argument('--metric', type=str, default='rmse')
@@ -58,38 +50,6 @@ def parse_option():
 
     return opt
 
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
-
-
-
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
-
 def main():
     opt = parse_option()
     model_name_list = ['vgg13','vgg16','resnet18','wrn_40_2']
@@ -109,14 +69,6 @@ def main():
         _, val_loader, n_data= get_two_sound_valid_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers=0,seed=opt.trial,atype=opt.atype)
         n_cls = 1
         mdict = tm_dict
-    elif opt.mtype == 'multi':
-        _, val_loader, n_data= get_detached_origin_sound_valid_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers=0,seed=opt.trial,atype=opt.atype)
-        n_cls = 1
-        mdict = mm_dict
-    elif opt.mtype == 'four':
-        _, val_loader, n_data= get_detached_sound_valid_dataloaders(path='./assets/newdata/',batch_size=opt.batch_size, num_workers=0,seed=opt.trial,atype=opt.atype)
-        n_cls = 1
-        mdict = fm_dict
     else:
         raise NotImplementedError()
 
@@ -127,12 +79,8 @@ def main():
         elif opt.mtype =='two':
             model_path = './assets/model/'+'{}-{}-ADAM-1-{}.pt'.format('two',mname,opt.trial)
             model = load_teacher(mname,mdict,model_path,n_cls)
-        elif opt.mtype =='multi':
-            model_path = './assets/model/'+'{}-{}-ADAM-1-{}.pt'.format('decoupled',mname,opt.trial)
-            model = load_teacher(mname,mdict,model_path,n_cls)
-        elif opt.mtype =='four':
-            model_path = './assets/model/'+'{}-{}-ADAM-1-{}.pt'.format('four',mname,opt.trial)
-            model = load_teacher(mname,mdict,model_path,n_cls)
+        else:
+            raise NotImplementedError()
             
         model.eval()
 

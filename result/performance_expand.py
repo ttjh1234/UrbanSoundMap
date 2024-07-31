@@ -2,7 +2,6 @@ import torch
 import numpy as np
 import os
 import pandas as pd
-from utils.util import *
 import torchvision.transforms as transforms
 from tqdm import tqdm
 from torch.utils.data import TensorDataset, DataLoader
@@ -12,6 +11,8 @@ from models import model_dict as sm_dict
 from multi_models import model_dict as mm_dict
 from four_models import model_dict as fm_dict
 from two_models import model_dict as tm_dict
+from utils.util import *
+from utils.metric import rmse_metric
 from dataset.sound_expand import get_four_valid_dataloaders, get_single_valid_dataloaders, get_three_valid_dataloaders, get_two_valid_dataloaders
 import random
 import argparse
@@ -58,40 +59,6 @@ def parse_option():
 
     return opt
 
-def load_teacher(model_name, model_dict, model_path, n_cls):
-    print('==> loading teacher model')
-    model = model_dict[model_name](num_classes=n_cls)
-    
-    try:
-        print("Single GPU Model Load")
-        model.load_state_dict(torch.load(model_path))
-        print("Load Single Model")
-    except:
-        print("Mutil GPU Model Load")
-        state_dict=torch.load(model_path)
-        new_state_dict = {}
-        for key in state_dict:
-            new_key = key.replace('module.','')
-            new_state_dict[new_key] = state_dict[key]
-        model.load_state_dict(new_state_dict)
-        print("Load Single GPU Model from Multi GPU Model")
-    
-    print('==> done')
-    return model
-
-
-def rmse_metric(ypred,y):
-    return np.sqrt(np.mean((y-ypred)**2))
-
-
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed) # if use multi-GPU
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
-    random.seed(seed)
 
 def main():
     opt = parse_option()
@@ -104,19 +71,38 @@ def main():
     for i in range(5):
         set_random_seed(i)
         if opt.method == 'single':
-            _, val_loader, n_data= get_single_valid_dataloaders(path='./assets/newdata/',batch_size=256, num_workers=0,seed=i,atype=opt.atype)
+            _, val_loader, n_data= get_single_valid_dataloaders(path='./assets/newdata/',
+                                                                batch_size=256, 
+                                                                num_workers=0,
+                                                                seed=i,
+                                                                atype=opt.atype)
             n_cls = 1
             mdict = sm_dict
         elif opt.method == 'two':
-            _, val_loader, n_data= get_two_valid_dataloaders(path='./assets/newdata/',resolution=opt.resolution_list[0], batch_size=256, num_workers=0,seed=i,atype=opt.atype)
+            _, val_loader, n_data= get_two_valid_dataloaders(path='./assets/newdata/',
+                                                             resolution=opt.resolution_list[0], 
+                                                             batch_size=256, 
+                                                             num_workers=0,
+                                                             seed=i,
+                                                             atype=opt.atype)
             n_cls = 1
             mdict = tm_dict
         elif opt.method == 'multi':
-            _, val_loader, n_data= get_three_valid_dataloaders(path='./assets/newdata/',resolution_list=opt.resolution_list[:-1],batch_size=256, num_workers=0,seed=i,atype=opt.atype)
+            _, val_loader, n_data= get_three_valid_dataloaders(path='./assets/newdata/',
+                                                               resolution_list=opt.resolution_list[:-1],
+                                                               batch_size=256, 
+                                                               num_workers=0,
+                                                               seed=i,
+                                                               atype=opt.atype)
             n_cls = 1
             mdict = mm_dict
         elif opt.method == 'four':
-            _, val_loader, n_data= get_four_valid_dataloaders(path='./assets/newdata/',resolution_list=opt.resolution_list[:-1],batch_size=256, num_workers=0,seed=i,atype=opt.atype)
+            _, val_loader, n_data= get_four_valid_dataloaders(path='./assets/newdata/',
+                                                              resolution_list=opt.resolution_list[:-1],
+                                                              batch_size=256, 
+                                                              num_workers=0,
+                                                              seed=i,
+                                                              atype=opt.atype)
             n_cls = 1
             mdict = fm_dict
         else:
